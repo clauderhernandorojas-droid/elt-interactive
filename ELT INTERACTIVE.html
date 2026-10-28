@@ -1,0 +1,1951 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELT Deck Studio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .thumbnail-card { transition: all 0.15s ease-in-out; }
+    .thumbnail-card.active {
+      border-color: #4f46e5;
+      background-color: #eef2ff;
+      box-shadow: 0 0 0 2px #4f46e5;
+    }
+    netlify-drawer, #netlify-drawer, [data-netlify-drawer], .netlify-badge {
+      display: none !important;
+      visibility: hidden !important;
+      pointer-events: none !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 h-screen flex flex-col overflow-hidden select-none">
+
+  <!-- BARRA SUPERIOR PRINCIPAL -->
+  <header class="bg-white border-b border-slate-200 px-4 py-2 flex items-center justify-between shrink-0 z-10 gap-3">
+    <!-- Logotipo y Nombre de la Lección -->
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center text-white font-black text-base shadow-sm shrink-0">
+        E
+      </div>
+      <div>
+        <div class="flex items-center gap-1.5">
+          <input type="text" id="lessonTitleInput" value="Nueva Lección" oninput="handleTitleInput(this.value)" onchange="handleTitleChange()" onkeydown="if(event.key==='Enter') this.blur()" class="text-sm md:text-base font-bold text-slate-900 bg-transparent hover:bg-slate-100/80 focus:bg-white px-2 py-0.5 rounded-lg border border-transparent hover:border-slate-300 focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 focus:outline-none transition w-48 sm:w-64 md:w-80 truncate cursor-text" title="Haz clic para renombrar la lección" placeholder="Título de la lección...">
+          <span id="saveStatusIndicator" class="text-[10px] text-amber-500 font-semibold italic shrink-0">• Sin guardar</span>
+        </div>
+        <p id="linkedFileDisplay" class="text-[10px] text-slate-400 font-medium pl-1.5 truncate max-w-[260px]">
+          📄 Sin vincular a disco
+        </p>
+      </div>
+    </div>
+
+    <!-- ACCIONES DE GESTIÓN Y ESTUDIO -->
+    <div class="flex items-center gap-1.5 md:gap-2 overflow-x-auto">
+      
+      <!-- Pila Undo / Redo -->
+      <div class="flex items-center bg-slate-50 border border-slate-200 rounded-lg p-0.5 mr-1">
+        <button id="undoBtn" onclick="undo()" title="Deshacer (Ctrl + Z)" disabled class="p-1.5 text-slate-400 hover:text-slate-800 disabled:opacity-30 disabled:pointer-events-none rounded transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a5 5 0 015 5v2m0 0l-4-4m4 4l4-4M3 10l4-4m-4 4l4 4"/></svg>
+        </button>
+        <button id="redoBtn" onclick="redo()" title="Rehacer (Ctrl + Y)" disabled class="p-1.5 text-slate-400 hover:text-slate-800 disabled:opacity-30 disabled:pointer-events-none rounded transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 10H11a5 5 0 00-5 5v2m0 0l4-4m-4 4l-4-4m20-4l-4-4m4 4l-4 4"/></svg>
+        </button>
+      </div>
+
+      <!-- Nueva Lección en Limpio -->
+      <button onclick="createNewProject()" class="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition shadow-sm" title="Empezar una lección en blanco">
+        <span>+ Nueva</span>
+      </button>
+
+      <!-- Abrir Proyecto -->
+      <button onclick="openProjectFile()" class="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition shadow-sm" title="Abrir archivo .eltdeck">
+        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9a2 2 0 00-2 2v5a2 2 0 01-2 2z"/></svg>
+        <span>Abrir</span>
+      </button>
+
+      <!-- Guardar Directo -->
+      <button onclick="saveProjectFile(false)" class="flex items-center gap-1 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 text-white rounded-lg text-xs font-bold transition shadow-sm" title="Guardar cambios en disco (Ctrl + S)">
+        <svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+        <span>Guardar</span>
+      </button>
+
+      <!-- Guardar Como -->
+      <button onclick="saveProjectFile(true)" class="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-600 rounded-lg text-xs font-semibold transition shadow-sm" title="Guardar como un archivo nuevo">
+        <span>Como...</span>
+      </button>
+
+      <!-- Edición Visual Directa -->
+      <button id="visualEditBtn" onclick="toggleVisualEdit()" class="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition shadow-sm" title="Editar textos directamente en la pantalla">
+        <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+        <span id="visualEditBtnText">Editar Textos</span>
+      </button>
+
+      <!-- Configurar IA -->
+      <button onclick="openSettingsModal()" class="flex items-center gap-1 px-2.5 py-1.5 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-bold transition shadow-sm">
+        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+        <span class="hidden md:inline">IA</span>
+      </button>
+
+      <!-- Editar Código -->
+      <button onclick="openCodeModal()" class="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition shadow-sm">
+        <svg class="w-4 h-4 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"/></svg>
+        <span class="hidden md:inline">Código</span>
+      </button>
+
+      <!-- Nueva Diapositiva IA -->
+      <button onclick="openGenerateModal()" class="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        <span>✨ Con IA</span>
+      </button>
+
+      <!-- Exportar para Alumnos -->
+      <button onclick="exportDeckPackage()" class="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold shadow-sm transition" title="Exportar la lección completa para entregar a los estudiantes">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+        <span class="hidden sm:inline">Exportar Alumnos</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- CONTENEDOR PRINCIPAL -->
+  <div class="flex-1 flex overflow-hidden">
+
+    <!-- MINIATURAS (IZQUIERDA) -->
+    <aside class="w-64 md:w-72 bg-white border-r border-slate-200 flex flex-col shrink-0">
+      <div class="p-3 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
+        <span class="text-xs font-bold text-slate-600 uppercase tracking-wider">Diapositivas (<span id="slideCountBadge">0</span>)</span>
+        <button onclick="addNewBlankSlide()" class="text-xs font-bold text-slate-600 hover:text-slate-900 px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 transition">
+          + En Blanco
+        </button>
+      </div>
+
+      <div id="slidesList" class="flex-1 overflow-y-auto p-3 space-y-2.5">
+        <!-- Render dinámico -->
+      </div>
+    </aside>
+
+    <!-- ESCENARIO CENTRAL -->
+    <main class="flex-1 bg-slate-100 flex flex-col p-3 md:p-5 overflow-hidden">
+      <div id="viewerWrapper" class="flex-1 bg-white rounded-2xl shadow-md border border-slate-200 overflow-hidden flex flex-col relative transition-all">
+        <div id="visualEditBanner" class="hidden bg-amber-500 text-white text-[11px] font-bold px-3 py-1.5 flex items-center justify-between shrink-0 shadow-sm">
+          <span>✏️ Modo Edición Visual Activo: haz clic sobre cualquier texto, encabezado o pregunta para corregirlo directamente.</span>
+          <button onclick="toggleVisualEdit()" class="bg-amber-700 hover:bg-amber-800 px-2.5 py-0.5 rounded text-[10px]">Guardar Cambios</button>
+        </div>
+        <iframe id="slideViewer" class="w-full flex-1 border-0" sandbox="allow-scripts allow-modals allow-same-origin"></iframe>
+      </div>
+
+      <!-- NAVEGACIÓN INFERIOR -->
+      <div class="relative z-50 mt-2.5 pb-4 sm:pb-1 flex items-center justify-between px-2 shrink-0" style="z-index: 9999; padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));">
+        <div class="flex items-center gap-2">
+          <button onclick="prevSlide()" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg shadow-sm">
+            ← Anterior
+          </button>
+          <span id="slideIndicator" class="text-xs font-bold text-slate-600 px-2">1 / 1</span>
+          <button onclick="nextSlide()" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg shadow-sm">
+            Siguiente →
+          </button>
+        </div>
+
+        <div class="flex items-center gap-2">
+          <button onclick="duplicateCurrentSlide()" class="px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-semibold rounded-lg">
+            Duplicar
+          </button>
+          <button onclick="deleteCurrentSlide()" class="px-2.5 py-1.5 bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 text-xs font-semibold rounded-lg">
+            Eliminar
+          </button>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- MODAL: GENERAR CON IA (SOPORTE CTRL+V MULTI-RECORTES) -->
+  <div id="generateModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[90vh]">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2">
+          <span class="text-indigo-600 font-bold">✨</span>
+          <h3 class="font-bold text-slate-900 text-sm">Crear / Refinar Diapositiva con IA</h3>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="clearGenerateModalAll()" class="text-xs font-semibold text-rose-600 hover:text-rose-800 bg-white hover:bg-rose-50 border border-slate-200 px-2.5 py-1 rounded-lg transition flex items-center gap-1 shadow-xs" title="Limpiar todas las fotos, recortes y audio para empezar de cero">
+            <span>🗑️ Limpiar todo el modal</span>
+          </button>
+          <button onclick="handleGenerateModalCancel()" class="text-slate-400 hover:text-slate-600 p-1" title="Cerrar modal">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-4 overflow-y-auto flex-1">
+        <div class="flex items-center justify-between text-xs text-slate-500 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200">
+          <span>Configuración activa:</span>
+          <span id="activeModelBadge" class="font-mono font-bold text-indigo-600 truncate max-w-[320px]">OpenRouter: openai/gpt-4o-mini</span>
+        </div>
+
+        <!-- MODO REFINAMIENTO (AJUSTAR SOBRE LA DIAPOSITIVA ACTUAL) -->
+        <div id="refineModeContainer" class="hidden p-3 bg-indigo-50/70 rounded-xl border border-indigo-200 transition-all">
+          <label class="flex items-start gap-2.5 cursor-pointer select-none">
+            <input type="checkbox" id="refineSlideCheckbox" onchange="toggleRefineModeUI()" class="mt-0.5 rounded text-indigo-600 focus:ring-indigo-500 w-4 h-4 cursor-pointer">
+            <div class="flex-1 text-xs">
+              <span class="font-bold text-slate-900 flex items-center gap-1.5">
+                <span>🔄 Modo refinamiento (Ajustar sobre la diapositiva actual #<span id="refineSlideNum">1</span>)</span>
+                <span class="text-[10px] text-indigo-700 bg-indigo-100 font-semibold px-2 py-0.2 rounded-full border border-indigo-200">Iterativo</span>
+              </span>
+              <p class="text-[11px] text-slate-500 mt-0.5">
+                Ajusta o corrige la diapositiva activa sin crear una nueva. La IA conservará su estructura, diseño, fotos del alumno y audio MP3.
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <!-- CAJA 1: FOTOS DEL EJERCICIO (PARA EL ALUMNO) -->
+        <div id="studentBoxContainer" onclick="setActivePasteTarget('student')" class="p-3 bg-indigo-50/40 rounded-xl border border-indigo-200/80 space-y-2 transition-all cursor-pointer ring-2 ring-indigo-500 shadow-md">
+          <div class="flex items-center justify-between flex-wrap gap-1.5">
+            <label class="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+              <span class="text-base">🖼️</span>
+              <span>Fotos del Ejercicio (Para el Alumno):</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <span id="studentActiveBadge" class="text-[10px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full border border-indigo-300 shadow-xs flex items-center gap-1">🎯 Zona activa para pegar con Ctrl + V</span>
+              <span class="text-[10px] text-indigo-700 font-semibold bg-indigo-100/80 px-2 py-0.5 rounded border border-indigo-200">Se renderizan</span>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500">Rostros, viñetas, personas o dibujos que los estudiantes deben ver (marcadores <code>{{STUDENT_IMG_1}}</code>, <code>{{STUDENT_IMG_2}}</code>...).</p>
+          
+          <div id="pasteZoneStudent" class="border-2 border-dashed border-indigo-300 hover:border-indigo-400 bg-white rounded-xl p-3 text-center transition select-none" ondragover="event.preventDefault(); this.classList.add('border-indigo-600', 'bg-indigo-50')" ondragleave="this.classList.remove('border-indigo-600', 'bg-indigo-50')" ondrop="handleStudentImageDrop(event)">
+            <input type="file" id="studentFileInput" accept="image/*" multiple class="hidden" onchange="handleStudentFilesSelected(event)">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-2">
+              <p class="text-xs font-bold text-indigo-950 flex items-center gap-1.5">
+                <span>Presiona</span>
+                <kbd class="px-1.5 py-0.5 bg-indigo-50 border border-indigo-200 rounded text-indigo-700 shadow-xs font-mono">Ctrl + V</kbd>
+                <span>para pegar capturas aquí</span>
+              </p>
+              <button type="button" onclick="event.stopPropagation(); document.getElementById('studentFileInput').click()" class="text-xs px-2.5 py-1 bg-white border border-slate-300 rounded shadow-xs hover:bg-slate-50 hover:border-indigo-400 text-slate-700 font-medium flex items-center gap-1.5 shrink-0 transition">
+                <span>📁 Examinar archivos</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs text-slate-600 font-semibold pt-0.5">
+            <span>Fotos cargadas (<span id="studentImagesCountBadge">0</span>):</span>
+            <button type="button" onclick="event.stopPropagation(); clearStudentImages()" id="clearStudentImagesBtn" class="text-[11px] font-semibold text-rose-600 hover:text-rose-800 hidden">Limpiar fotos</button>
+          </div>
+          <div id="studentImagesPreviewGallery" class="grid grid-cols-2 sm:grid-cols-3 gap-2 min-h-[56px] p-2 bg-white border border-slate-200 rounded-lg">
+            <p id="noStudentImagesNotice" class="col-span-full text-center text-xs text-slate-400 py-2.5">Aún no has agregado fotos del ejercicio.</p>
+          </div>
+        </div>
+
+        <!-- CAJA 2: RECORTES DEL LIBRO (SOLO LECTURA / OCR PARA LA IA) -->
+        <div id="referenceBoxContainer" onclick="setActivePasteTarget('reference')" class="p-3 bg-amber-50/40 rounded-xl border border-amber-200/80 space-y-2 transition-all cursor-pointer">
+          <div class="flex items-center justify-between flex-wrap gap-1.5">
+            <label class="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+              <span class="text-base">📄</span>
+              <span>Recortes del Libro (Solo lectura / OCR para la IA):</span>
+            </label>
+            <div class="flex items-center gap-1.5">
+              <span id="referenceActiveBadge" class="hidden text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300 shadow-xs flex items-center gap-1">🎯 Zona activa para pegar con Ctrl + V</span>
+              <span class="text-[10px] text-amber-800 font-semibold bg-amber-100/90 px-2 py-0.5 rounded border border-amber-200">Solo OCR • NUNCA se incrusta</span>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-500">Enunciados, textos, tablas o Answer Keys que la IA lee para armar la interactividad pero NO debe renderizar.</p>
+          
+          <div id="pasteZoneReference" class="border-2 border-dashed border-amber-300 hover:border-amber-400 bg-white rounded-xl p-3 text-center transition select-none" ondragover="event.preventDefault(); this.classList.add('border-amber-600', 'bg-amber-50')" ondragleave="this.classList.remove('border-amber-600', 'bg-amber-50')" ondrop="handleReferenceImageDrop(event)">
+            <input type="file" id="referenceFileInput" accept="image/*" multiple class="hidden" onchange="handleReferenceFilesSelected(event)">
+            <div class="flex flex-col sm:flex-row items-center justify-between gap-2">
+              <p class="text-xs font-bold text-amber-950 flex items-center gap-1.5">
+                <span>Presiona</span>
+                <kbd class="px-1.5 py-0.5 bg-amber-50 border border-amber-200 rounded text-amber-800 shadow-xs font-mono">Ctrl + V</kbd>
+                <span>para pegar capturas OCR aquí</span>
+              </p>
+              <button type="button" onclick="event.stopPropagation(); document.getElementById('referenceFileInput').click()" class="text-xs px-2.5 py-1 bg-white border border-slate-300 rounded shadow-xs hover:bg-slate-50 hover:border-amber-400 text-slate-700 font-medium flex items-center gap-1.5 shrink-0 transition">
+                <span>📁 Examinar archivos</span>
+              </button>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-between text-xs text-slate-600 font-semibold pt-0.5">
+            <span>Recortes OCR cargados (<span id="referenceImagesCountBadge">0</span>):</span>
+            <button type="button" onclick="event.stopPropagation(); clearReferenceImages()" id="clearReferenceImagesBtn" class="text-[11px] font-semibold text-rose-600 hover:text-rose-800 hidden">Limpiar recortes</button>
+          </div>
+          <div id="referenceImagesPreviewGallery" class="grid grid-cols-2 sm:grid-cols-3 gap-2 min-h-[56px] p-2 bg-white border border-slate-200 rounded-lg">
+            <p id="noReferenceImagesNotice" class="col-span-full text-center text-xs text-slate-400 py-2.5">Aún no has agregado recortes de referencia OCR.</p>
+          </div>
+        </div>
+
+        <!-- SECCIÓN DE AUDIO & TRANSCRIPCIÓN (OPCIONAL, 0 TOKENS) -->
+        <div class="space-y-3 pt-2 border-t border-slate-200">
+          <!-- Selector de Audio MP3 (Opcional) -->
+          <div>
+            <div class="flex items-center justify-between mb-1.5">
+              <label class="flex items-center gap-1.5 text-xs font-bold text-slate-700">
+                <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                <span>Selector de Audio MP3 (Opcional):</span>
+              </label>
+              <span class="text-[10px] text-emerald-700 font-semibold bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">0 Tokens IA (Local)</span>
+            </div>
+            
+            <input type="file" id="audioFileInput" accept="audio/mp3,audio/*" class="hidden" onchange="handleAudioSelected(event)">
+
+            <!-- Zona vacía de selección / arrastre de audio -->
+            <div id="audioDropZone" class="border border-dashed border-slate-300 hover:border-indigo-400 bg-slate-50 hover:bg-indigo-50/40 rounded-xl p-3 transition cursor-pointer flex items-center justify-between" onclick="document.getElementById('audioFileInput').click()" ondragover="event.preventDefault(); this.classList.add('border-indigo-500', 'bg-indigo-50/70')" ondragleave="this.classList.remove('border-indigo-500', 'bg-indigo-50/70')" ondrop="handleAudioDrop(event)">
+              <div class="flex items-center gap-2.5">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/></svg>
+                </div>
+                <div class="text-left">
+                  <p class="text-xs font-semibold text-slate-700">Cargar o arrastrar archivo de audio</p>
+                  <p class="text-[10px] text-slate-400">MP3 o audio de la actividad (procesamiento 100% en memoria local)</p>
+                </div>
+              </div>
+              <span class="text-xs font-bold text-indigo-600 px-2.5 py-1 rounded-lg bg-white border border-slate-200 shadow-sm shrink-0">Examinar</span>
+            </div>
+
+            <!-- Previsualización de Audio Cargado -->
+            <div id="audioLoadedDisplay" class="hidden border border-indigo-200 bg-indigo-50/50 rounded-xl p-2.5 flex items-center justify-between">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <div class="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3"/></svg>
+                </div>
+                <div class="min-w-0">
+                  <p id="audioFileName" class="text-xs font-bold text-slate-800 truncate">audio.mp3</p>
+                  <p id="audioFileSize" class="text-[10px] text-indigo-700 font-medium">0 KB • En memoria local</p>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 shrink-0">
+                <audio id="audioLocalPreview" controls class="h-7 w-36 max-w-[150px] hidden sm:block"></audio>
+                <button type="button" onclick="removeAudio()" class="flex items-center gap-1 text-[11px] font-bold text-rose-600 hover:text-rose-800 bg-white hover:bg-rose-50 border border-slate-200 px-2.5 py-1 rounded-lg transition" title="Quitar archivo de audio">
+                  <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                  <span>Quitar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Área de Texto para Transcripción (Audio Script - Opcional) -->
+          <div>
+            <details class="group rounded-xl border border-slate-200 bg-slate-50/40 p-2.5 transition open:bg-white open:shadow-xs">
+              <summary class="flex items-center justify-between cursor-pointer list-none select-none text-xs font-bold text-slate-700">
+                <div class="flex items-center gap-1.5">
+                  <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                  <span>Área de Texto para Transcripción (Audio Script - Opcional)</span>
+                </div>
+                <span class="text-slate-400 group-open:rotate-180 transition-transform duration-200">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </span>
+              </summary>
+              <div class="mt-2.5">
+                <textarea id="audioScriptInput" rows="3" placeholder="Pega aquí el Audio Script / Transcripción del libro (Opcional)..." class="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none resize-y font-mono text-slate-700"></textarea>
+                <p class="text-[10px] text-slate-400 mt-1">Si no adjuntas MP3, la diapositiva usará la Web Speech API del navegador para lectura auditiva nativa.</p>
+              </div>
+            </details>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Instrucción específica para la IA (Opcional):</label>
+          <input type="text" id="optionalInstructions" placeholder="Ej: La imagen 1 es referencia; crea interactivo únicamente el ejercicio 1b con selectores." class="w-full text-xs p-2.5 rounded-lg border border-slate-200 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        </div>
+
+        <div id="aiLoadingIndicator" class="hidden text-center py-4 bg-indigo-50 rounded-xl border border-indigo-100">
+          <div class="inline-block animate-spin rounded-full h-6 w-6 border-2 border-indigo-600 border-t-transparent mb-2"></div>
+          <p class="text-xs font-bold text-indigo-950">Analizando recortes y generando código responsive...</p>
+          <p class="text-[10px] text-indigo-600">Suele tomar entre 4 y 10 segundos</p>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button onclick="handleGenerateModalCancel()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800">Cancelar</button>
+        <button id="generateAiBtn" onclick="runAiGeneration()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition">
+          Generar Diapositiva
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: AJUSTES DE IA HÍBRIDA (OPENROUTER / GOOGLE AI STUDIO) -->
+  <div id="settingsModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <h3 class="font-bold text-slate-900 text-sm">Configuración de Proveedor de IA</h3>
+        <button onclick="closeSettingsModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+
+      <div class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Proveedor:</label>
+          <select id="aiProviderSelect" onchange="handleProviderChange()" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+            <option value="openrouter">OpenRouter (Rápido • Sin caídas 503 • Ultra económico)</option>
+            <option value="google">Google AI Studio (Gratis con cuotas de espera)</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">API Key:</label>
+          <input type="password" id="aiApiKeyInput" placeholder="sk-or-v1-..." class="w-full text-xs p-2.5 rounded-lg border border-slate-200 font-mono focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Identificador del Modelo:</label>
+          <input type="text" id="aiModelInput" placeholder="openai/gpt-4o-mini" class="w-full text-xs p-2.5 rounded-lg border border-slate-200 font-mono text-indigo-700 font-bold focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+          <p id="modelHelpText" class="text-[10px] text-slate-400 mt-1">Recomendados OpenRouter: <code>openai/gpt-4o-mini</code> o <code>google/gemini-2.5-flash</code></p>
+        </div>
+      </div>
+
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button onclick="closeSettingsModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800">Cancelar</button>
+        <button onclick="saveSettings()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition">
+          Guardar Ajustes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: EDITOR DE CÓDIGO HTML -->
+  <div id="codeModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-3xl w-full h-[85vh] shadow-2xl border border-slate-200 flex flex-col overflow-hidden">
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div>
+          <h3 class="font-bold text-slate-900 text-sm">Código HTML de la Diapositiva</h3>
+          <p class="text-[11px] text-slate-500">Edición manual directa de la diapositiva activa</p>
+        </div>
+        <button onclick="closeCodeModal()" class="text-slate-400 hover:text-slate-600 p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div class="flex-1 p-4 bg-slate-900">
+        <textarea id="codeEditorArea" class="w-full h-full bg-transparent text-emerald-400 font-mono text-xs p-2 focus:outline-none resize-none leading-relaxed" spellcheck="false"></textarea>
+      </div>
+      <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end gap-2">
+        <button onclick="closeCodeModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800">Cancelar</button>
+        <button onclick="saveCodeModalChanges()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm">Guardar Cambios</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT OCULTO PARA FALLBACK DE ABRIR ARCHIVO -->
+  <input type="file" id="legacyFileInput" accept=".eltdeck,.html,.json" class="hidden" onchange="handleLegacyFileLoad(event)">
+
+  <!-- SCRIPT PRINCIPAL -->
+  <script>
+    // Estado del Proyecto
+    let currentLessonTitle = "Nueva Lección";
+    let fileHandle = null;
+    let isDirty = false;
+    let isVisualEditing = false;
+
+    let slides = [
+      {
+        id: 1,
+        title: "Reading: Prepositions with Adjectives",
+        html: `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.tailwindcss.com"><\/script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; -webkit-tap-highlight-color: transparent; }
+    .select-pill {
+      font-weight: 600;
+      border: 1.5px solid #cbd5e1;
+      border-radius: 9999px;
+      padding: 6px 12px;
+      background: #ffffff;
+      color: #334155;
+      outline: none;
+      font-size: 14px;
+      transition: all 0.15s;
+    }
+    .select-pill.correct { background: #dcfce7; border-color: #16a34a; color: #15803d; }
+    .select-pill.incorrect { background: #fee2e2; border-color: #dc2626; color: #b91c1c; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 p-4 md:p-6 min-h-screen flex flex-col justify-between">
+  <div class="max-w-3xl mx-auto w-full bg-white p-5 md:p-6 rounded-2xl shadow-sm border border-slate-200">
+    <div class="mb-4 pb-3 border-b border-slate-100 flex items-center justify-between">
+      <div>
+        <span class="text-xs font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded">Exercise 2a</span>
+        <h2 class="text-base md:text-lg font-bold text-slate-900 mt-1">Reading: Prepositions with Adjectives</h2>
+      </div>
+    </div>
+    <div class="space-y-4 text-sm leading-relaxed text-slate-700">
+      <p>A recent experiment in the UK attempted to discover the world's funniest jokes. The website received over 40,000 jokes and 2 million ratings!</p>
+      <p>Many European countries preferred jokes about things we normally worry <span class="bg-slate-100 text-slate-700 px-2 py-0.5 rounded-full font-bold text-xs border border-slate-300">about (Ex)</span> - for example, death, illness and marriage.</p>
+      <p>Americans and Canadians liked jokes where someone was better <select class="select-pill" data-answer="at"><option value="">---</option><option value="in">in</option><option value="of">of</option><option value="at">at</option></select> something than someone else.</p>
+      <p>Germans, in particular, seem to be keen <select class="select-pill" data-answer="on"><option value="">---</option><option value="at">at</option><option value="on">on</option><option value="about">about</option></select> jokes.</p>
+      <p>Dr Wiseman is interested <select class="select-pill" data-answer="in"><option value="">---</option><option value="in">in</option><option value="on">on</option><option value="at">at</option></select> how we communicate.</p>
+      <p>Dr Wiseman was very pleased <select class="select-pill" data-answer="with"><option value="">---</option><option value="of">of</option><option value="with">with</option><option value="at">at</option></select> the results.</p>
+      <p>We feel superior to someone in the joke and we are surprised <select class="select-pill" data-answer="by"><option value="">---</option><option value="of">of</option><option value="by">by</option><option value="in">in</option></select> something in the joke.</p>
+    </div>
+    <div class="mt-6 pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <div id="scoreBox" class="text-xs font-bold text-slate-500 text-center sm:text-left">Selecciona las preposiciones y pulsa Check Answers.</div>
+      <div class="flex gap-2 w-full sm:w-auto">
+        <button onclick="resetAnswers()" class="flex-1 sm:flex-initial px-4 py-2 text-xs font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg">Reset</button>
+        <button onclick="checkAnswers()" class="flex-1 sm:flex-initial px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg shadow-sm">Check Answers</button>
+      </div>
+    </div>
+  </div>
+  <script>
+    function checkAnswers() {
+      const selects = document.querySelectorAll('select.select-pill');
+      let correct = 0;
+      selects.forEach(sel => {
+        sel.classList.remove('correct', 'incorrect');
+        if (sel.value === sel.getAttribute('data-answer')) {
+          sel.classList.add('correct');
+          correct++;
+        } else {
+          sel.classList.add('incorrect');
+        }
+      });
+      document.getElementById('scoreBox').textContent = 'Puntaje: ' + correct + ' / ' + selects.length;
+      if (window.parent && window.parent !== window) {
+        window.parent.postMessage({ type: 'ACTIVITY_SCORE', score: correct, total: selects.length }, '*');
+      }
+    }
+    function resetAnswers() {
+      document.querySelectorAll('select.select-pill').forEach(sel => {
+        sel.value = '';
+        sel.classList.remove('correct', 'incorrect');
+      });
+      document.getElementById('scoreBox').textContent = 'Selecciona las preposiciones y pulsa Check Answers.';
+    }
+  <\/script>
+</body>
+</html>`
+      }
+    ];
+
+    let currentSlideIndex = 0;
+    let studentImages = [];
+    let referenceImages = [];
+    let activePasteTarget = 'student'; // 'student' | 'reference'
+    let activeImageDropzone = 'student'; // compatibilidad
+    let currentAudioBase64 = null;
+    let currentAudioName = '';
+    let currentAiAbortController = null;
+
+    // ==========================================
+    // SISTEMA DE HISTORIAL (UNDO / REDO)
+    // ==========================================
+    let historyStack = [];
+    let historyStep = -1;
+
+    function saveHistorySnapshot() {
+      historyStack = historyStack.slice(0, historyStep + 1);
+      historyStack.push({
+        slides: JSON.parse(JSON.stringify(slides)),
+        currentIndex: currentSlideIndex,
+        title: currentLessonTitle
+      });
+      historyStep++;
+      updateHistoryButtons();
+      setDirty(true);
+      autoSaveToLocalStorage();
+    }
+
+    function undo() {
+      if (isVisualEditing) toggleVisualEdit();
+      if (historyStep > 0) {
+        historyStep--;
+        const state = historyStack[historyStep];
+        slides = JSON.parse(JSON.stringify(state.slides));
+        currentSlideIndex = Math.min(state.currentIndex, slides.length - 1);
+        currentLessonTitle = state.title || currentLessonTitle;
+        document.getElementById('lessonTitleInput').value = currentLessonTitle;
+        renderSlidesList();
+        loadSlide(currentSlideIndex, false);
+        updateHistoryButtons();
+      }
+    }
+
+    function redo() {
+      if (isVisualEditing) toggleVisualEdit();
+      if (historyStep < historyStack.length - 1) {
+        historyStep++;
+        const state = historyStack[historyStep];
+        slides = JSON.parse(JSON.stringify(state.slides));
+        currentSlideIndex = Math.min(state.currentIndex, slides.length - 1);
+        currentLessonTitle = state.title || currentLessonTitle;
+        document.getElementById('lessonTitleInput').value = currentLessonTitle;
+        renderSlidesList();
+        loadSlide(currentSlideIndex, false);
+        updateHistoryButtons();
+      }
+    }
+
+    function updateHistoryButtons() {
+      document.getElementById('undoBtn').disabled = (historyStep <= 0);
+      document.getElementById('redoBtn').disabled = (historyStep >= historyStack.length - 1);
+    }
+
+    function setDirty(state) {
+      isDirty = state;
+      const indicator = document.getElementById('saveStatusIndicator');
+      if (state) {
+        indicator.textContent = '• Cambios sin guardar';
+        indicator.className = 'text-[10px] text-amber-500 font-semibold italic';
+      } else {
+        indicator.textContent = '• Guardado';
+        indicator.className = 'text-[10px] text-emerald-600 font-semibold italic';
+      }
+    }
+
+    function updateLinkedFileUI() {
+      const display = document.getElementById('linkedFileDisplay');
+      if (fileHandle && fileHandle.name) {
+        display.textContent = `📄 Disco: ${fileHandle.name}`;
+        display.className = "text-[10px] text-indigo-600 font-bold pl-1.5 truncate max-w-[260px]";
+      } else {
+        display.textContent = "📄 Sin archivo en disco (usará Guardar Como)";
+        display.className = "text-[10px] text-slate-400 font-medium pl-1.5 truncate max-w-[260px]";
+      }
+    }
+
+    function handleTitleInput(val) {
+      const cleanVal = val.trim();
+      currentLessonTitle = cleanVal || "Nueva Lección";
+      setDirty(true);
+      document.title = `${currentLessonTitle} - ELT Deck Studio`;
+      autoSaveToLocalStorage();
+    }
+
+    function handleTitleChange() {
+      const input = document.getElementById('lessonTitleInput');
+      const val = input ? input.value.trim() : "";
+      currentLessonTitle = val || "Nueva Lección";
+      if (input) input.value = currentLessonTitle;
+      document.title = `${currentLessonTitle} - ELT Deck Studio`;
+      
+      // Si el profesor cambia el nombre del tema, desvinculamos el archivo anterior para no pisarlo
+      fileHandle = null;
+      updateLinkedFileUI();
+      saveHistorySnapshot();
+    }
+
+    function createNewProject() {
+      if (isDirty && !confirm("Tienes cambios sin guardar en esta lección. ¿Deseas empezar una lección nueva desde cero?")) {
+        return;
+      }
+      try {
+        localStorage.removeItem('elt_session_draft');
+        localStorage.removeItem('elt_autosave_session');
+      } catch (e) {}
+
+      currentLessonTitle = "Nueva Lección";
+      document.getElementById('lessonTitleInput').value = currentLessonTitle;
+      document.title = "ELT Deck Studio";
+      fileHandle = null;
+      updateLinkedFileUI();
+      slides = [{
+        id: Date.now(),
+        title: "Diapositiva 1",
+        html: `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center;color:#64748b;"><h2>Nueva Lección en Blanco</h2><p>Pulsa '✨ Con IA' para digitalizar un ejercicio de tu libro.</p></body></html>`
+      }];
+      currentSlideIndex = 0;
+      historyStack = [];
+      historyStep = -1;
+      historyStack.push({
+        slides: JSON.parse(JSON.stringify(slides)),
+        currentIndex: currentSlideIndex,
+        title: currentLessonTitle
+      });
+      historyStep++;
+      updateHistoryButtons();
+      renderSlideList();
+      renderCurrentSlide();
+      setDirty(false);
+    }
+
+    // ==========================================
+    // EDICIÓN VISUAL DIRECTA (contentEditable)
+    // ==========================================
+    function toggleVisualEdit() {
+      const iframe = document.getElementById('slideViewer');
+      const wrapper = document.getElementById('viewerWrapper');
+      const banner = document.getElementById('visualEditBanner');
+      const btn = document.getElementById('visualEditBtn');
+      const btnText = document.getElementById('visualEditBtnText');
+
+      let iframeDoc = null;
+      try {
+        iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+      } catch (e) {
+        alert("No se puede editar directamente por restricciones de seguridad del navegador.");
+        return;
+      }
+
+      isVisualEditing = !isVisualEditing;
+
+      if (isVisualEditing) {
+        iframeDoc.designMode = "on";
+        wrapper.classList.add('ring-4', 'ring-amber-400');
+        banner.classList.remove('hidden');
+        btn.className = "flex items-center gap-1 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition shadow-md";
+        btnText.textContent = "Listo (Guardar)";
+      } else {
+        iframeDoc.designMode = "off";
+        wrapper.classList.remove('ring-4', 'ring-amber-400');
+        banner.classList.add('hidden');
+        btn.className = "flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition shadow-sm";
+        btnText.textContent = "Editar Textos";
+
+        const updatedHtml = '<!DOCTYPE html>\n' + iframeDoc.documentElement.outerHTML;
+        slides[currentSlideIndex].html = updatedHtml;
+        saveHistorySnapshot();
+      }
+    }
+
+    // ==========================================
+    // GUARDADO DIRECTO & APERTURA EN DISCO
+    // (CON MEMORIA DE CARPETA AUTOMÁTICA)
+    // ==========================================
+    function sanitizeFilename(name) {
+      return name.replace(/[^a-z0-9áéíóúñ_\- ]/gi, '_').trim() || 'leccion';
+    }
+
+    async function saveProjectFile(forceSaveAs = false) {
+      if (isVisualEditing) toggleVisualEdit();
+
+      // Sincronizar título desde el input si fue editado
+      const inputEl = document.getElementById('lessonTitleInput');
+      if (inputEl && inputEl.value.trim()) {
+        currentLessonTitle = inputEl.value.trim();
+      }
+
+      if ('showSaveFilePicker' in window) {
+        try {
+          if (forceSaveAs || !fileHandle) {
+            const suggestedName = `${sanitizeFilename(currentLessonTitle)}.eltdeck`;
+            fileHandle = await window.showSaveFilePicker({
+              id: 'elt_interactive_lessons_dir', // Memoria nativa persistente de carpeta
+              suggestedName: suggestedName,
+              types: [{
+                description: 'Archivo de Proyecto ELT Deck (*.eltdeck)',
+                accept: { 'application/json': ['.eltdeck', '.json'] }
+              }]
+            });
+
+            // Sincronización automática con el nombre de archivo asignado en el diálogo
+            if (fileHandle && fileHandle.name) {
+              const fileBaseName = fileHandle.name.replace(/\.(eltdeck|json|html)$/i, '').trim();
+              if (fileBaseName && (currentLessonTitle === "Nueva Lección" || forceSaveAs)) {
+                currentLessonTitle = fileBaseName;
+                if (inputEl) inputEl.value = currentLessonTitle;
+                document.title = `${currentLessonTitle} - ELT Deck Studio`;
+              }
+            }
+          }
+
+          const projectData = {
+            version: "2.0",
+            title: currentLessonTitle,
+            updatedAt: new Date().toISOString(),
+            slides: slides
+          };
+          const jsonStr = JSON.stringify(projectData, null, 2);
+
+          const writable = await fileHandle.createWritable();
+          await writable.write(jsonStr);
+          await writable.close();
+
+          setDirty(false);
+          updateLinkedFileUI();
+          alert(`Guardado con éxito en:\n${fileHandle.name}`);
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.warn("Falló acceso a File System API, usando descarga:", err);
+        }
+      }
+
+      // Fallback tradicional por descarga
+      const projectData = {
+        version: "2.0",
+        title: currentLessonTitle,
+        updatedAt: new Date().toISOString(),
+        slides: slides
+      };
+      const jsonStr = JSON.stringify(projectData, null, 2);
+
+      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${sanitizeFilename(currentLessonTitle)}.eltdeck`;
+      a.click();
+      setDirty(false);
+    }
+
+    const saveProjectFileAs = () => saveProjectFile(true);
+
+    async function openProjectFile() {
+      if (isVisualEditing) toggleVisualEdit();
+
+      if ('showOpenFilePicker' in window) {
+        try {
+          const [handle] = await window.showOpenFilePicker({
+            id: 'elt_interactive_lessons_dir', // Memoria nativa persistente de carpeta
+            types: [{
+              description: 'Archivos ELT Deck (*.eltdeck, *.json)',
+              accept: { 'application/json': ['.eltdeck', '.json'] }
+            }],
+            multiple: false
+          });
+          const file = await handle.getFile();
+          const content = await file.text();
+          
+          loadProjectFromText(content, file.name);
+          fileHandle = handle;
+          updateLinkedFileUI();
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.warn("Falló File Picker, usando fallback:", err);
+        }
+      }
+
+      document.getElementById('legacyFileInput').click();
+    }
+
+    function handleLegacyFileLoad(e) {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = evt => {
+        loadProjectFromText(evt.target.result, file.name);
+        fileHandle = null;
+        updateLinkedFileUI();
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    }
+
+    function loadProjectFromText(rawText, filename = '') {
+      try {
+        const data = JSON.parse(rawText);
+        if (!data.slides || !Array.isArray(data.slides)) {
+          throw new Error("El archivo no tiene el formato válido de diapositivas.");
+        }
+        slides = data.slides;
+
+        // Extraer nombre base de archivo sin extensión (ej. "Int WB U2 Lesson 2A.eltdeck" -> "Int WB U2 Lesson 2A")
+        let fileBaseName = '';
+        if (filename) {
+          fileBaseName = filename.replace(/\.(eltdeck|json|html)$/i, '').trim();
+        }
+
+        // Si el archivo en disco tiene un nombre explícito y el título interno es genérico ("Nueva Lección", "Lección Recuperada" o vacío),
+        // o si el título en la UI aún era "Nueva Lección", sincronizar automáticamente con el nombre del archivo
+        if (fileBaseName && (!data.title || data.title === 'Nueva Lección' || data.title === 'Lección Recuperada')) {
+          currentLessonTitle = fileBaseName;
+        } else if (data.title && data.title !== 'Nueva Lección' && data.title !== 'Lección Recuperada') {
+          currentLessonTitle = data.title;
+        } else if (fileBaseName) {
+          currentLessonTitle = fileBaseName;
+        } else {
+          currentLessonTitle = "Nueva Lección";
+        }
+
+        const inputEl = document.getElementById('lessonTitleInput');
+        if (inputEl) inputEl.value = currentLessonTitle;
+        document.title = `${currentLessonTitle} - ELT Deck Studio`;
+
+        currentSlideIndex = 0;
+        historyStack = [];
+        historyStep = -1;
+        saveHistorySnapshot();
+        loadSlide(0, false);
+        setDirty(false);
+        alert(`¡Lección "${currentLessonTitle}" cargada correctamente! (${slides.length} diapositivas)`);
+      } catch (err) {
+        alert("Error al abrir el archivo: " + err.message);
+      }
+    }
+
+    function autoSaveToLocalStorage() {
+      try {
+        localStorage.setItem('elt_session_draft', JSON.stringify({
+          title: currentLessonTitle,
+          slides: slides
+        }));
+      } catch (e) {
+        console.warn("No se pudo guardar borrador en localStorage:", e);
+      }
+    }
+
+    function tryRestoreAutoSave() {
+      const saved = localStorage.getItem('elt_session_draft') || localStorage.getItem('elt_autosave_session');
+      if (saved) {
+        try {
+          const draft = JSON.parse(saved);
+          if (draft && draft.slides && Array.isArray(draft.slides) && draft.slides.length > 0) {
+            currentLessonTitle = draft.title || "Nueva Lección";
+            const inputEl = document.getElementById('lessonTitleInput');
+            if (inputEl) inputEl.value = currentLessonTitle;
+            if (currentLessonTitle !== "Nueva Lección") {
+              document.title = `${currentLessonTitle} - ELT Deck Studio`;
+            }
+            slides = draft.slides;
+            renderSlideList();
+            renderCurrentSlide();
+            return true;
+          }
+        } catch (e) {
+          console.warn("Error al restaurar borrador de sesión:", e);
+        }
+      }
+      return false;
+    }
+
+    // ==========================================
+    // ENTORNO Y NAVEGACIÓN DE DIAPOSITIVAS
+    // ==========================================
+    window.addEventListener('DOMContentLoaded', () => {
+      const restored = tryRestoreAutoSave();
+      if (!restored) {
+        renderSlideList();
+        renderCurrentSlide();
+      }
+      updateBadge();
+      updateLinkedFileUI();
+      saveHistorySnapshot();
+      setDirty(restored ? true : false);
+
+      window.addEventListener('paste', handleGlobalPaste);
+
+      window.addEventListener('keydown', (e) => {
+        if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+
+        if (e.ctrlKey || e.metaKey) {
+          if (e.key === 's' || e.key === 'S') {
+            e.preventDefault();
+            saveProjectFile(false);
+          } else if (e.key === 'z' && !e.shiftKey) {
+            e.preventDefault();
+            undo();
+          } else if (e.key === 'y' || (e.key === 'z' && e.shiftKey) || (e.key === 'Z' && e.shiftKey)) {
+            e.preventDefault();
+            redo();
+          }
+        }
+      });
+    });
+
+    function getSavedProvider() { return localStorage.getItem('ai_provider') || 'openrouter'; }
+    function getSavedKey() { return localStorage.getItem('ai_api_key') || ''; }
+    function getSavedModel() { 
+      return localStorage.getItem('ai_model') || (getSavedProvider() === 'openrouter' ? 'openai/gpt-4o-mini' : 'gemini-3.5-flash-lite'); 
+    }
+
+    function updateBadge() { 
+      const p = getSavedProvider() === 'openrouter' ? 'OpenRouter' : 'Google';
+      document.getElementById('activeModelBadge').textContent = `${p}: ${getSavedModel()}`; 
+    }
+
+    function renderSlidesList() {
+      const list = document.getElementById('slidesList');
+      list.innerHTML = '';
+      slides.forEach((slide, idx) => {
+        const item = document.createElement('div');
+        item.className = `thumbnail-card p-2.5 rounded-xl border border-slate-200 bg-white cursor-pointer relative ${idx === currentSlideIndex ? 'active' : 'hover:border-slate-300'}`;
+        item.onclick = (e) => {
+          if (e.target.closest('.reorder-btn')) return;
+          if (isVisualEditing) toggleVisualEdit();
+          loadSlide(idx, false);
+        };
+
+        item.innerHTML = `
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[11px] font-black text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">#${idx + 1}</span>
+            <div class="flex items-center gap-1">
+              <button onclick="moveSlide(${idx}, -1)" class="reorder-btn p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 text-[10px]" title="Subir diapositiva" ${idx === 0 ? 'disabled' : ''}>▲</button>
+              <button onclick="moveSlide(${idx}, 1)" class="reorder-btn p-0.5 text-slate-400 hover:text-slate-700 disabled:opacity-20 text-[10px]" title="Bajar diapositiva" ${idx === slides.length - 1 ? 'disabled' : ''}>▼</button>
+            </div>
+          </div>
+          <div class="h-14 bg-slate-50 border border-slate-100 rounded-lg flex items-center justify-center text-slate-400 text-xs font-medium overflow-hidden px-2 text-center pointer-events-none select-none">
+            ${slide.title}
+          </div>
+        `;
+        list.appendChild(item);
+      });
+
+      document.getElementById('slideCountBadge').textContent = slides.length;
+      document.getElementById('slideIndicator').textContent = `${currentSlideIndex + 1} / ${slides.length}`;
+    }
+
+    function moveSlide(fromIdx, direction) {
+      if (isVisualEditing) toggleVisualEdit();
+      const toIdx = fromIdx + direction;
+      if (toIdx < 0 || toIdx >= slides.length) return;
+      const temp = slides[fromIdx];
+      slides[fromIdx] = slides[toIdx];
+      slides[toIdx] = temp;
+      currentSlideIndex = toIdx;
+      renderSlidesList();
+      loadSlide(currentSlideIndex, false);
+      saveHistorySnapshot();
+    }
+
+    function loadSlide(index, trackHistory = false) {
+      if (index < 0 || index >= slides.length) return;
+      currentSlideIndex = index;
+      renderSlidesList();
+      document.getElementById('slideViewer').srcdoc = slides[currentSlideIndex].html;
+      if (trackHistory) saveHistorySnapshot();
+    }
+
+    function renderCurrentSlide() { loadSlide(currentSlideIndex, false); }
+    const renderSlideList = renderSlidesList;
+    const pushUndoSnapshot = saveHistorySnapshot;
+
+    function prevSlide() {
+      if (isVisualEditing) toggleVisualEdit();
+      if (currentSlideIndex > 0) loadSlide(currentSlideIndex - 1, false);
+    }
+    function nextSlide() {
+      if (isVisualEditing) toggleVisualEdit();
+      if (currentSlideIndex < slides.length - 1) loadSlide(currentSlideIndex + 1, false);
+    }
+
+    function addNewBlankSlide() {
+      if (isVisualEditing) toggleVisualEdit();
+      const newId = slides.length + 1;
+      slides.push({
+        id: newId,
+        title: `Diapositiva ${newId}`,
+        html: `<!DOCTYPE html><html><body style="font-family:sans-serif;padding:40px;text-align:center;color:#64748b;"><h2>Diapositiva en blanco</h2><p>Pulsa '✨ Con IA' para digitalizar un ejercicio o pega código en 'Código'.</p></body></html>`
+      });
+      currentSlideIndex = slides.length - 1;
+      loadSlide(currentSlideIndex, false);
+      saveHistorySnapshot();
+    }
+
+    function duplicateCurrentSlide() {
+      if (isVisualEditing) toggleVisualEdit();
+      const current = slides[currentSlideIndex];
+      slides.splice(currentSlideIndex + 1, 0, {
+        id: Date.now(),
+        title: `${current.title} (Copia)`,
+        html: current.html
+      });
+      currentSlideIndex = currentSlideIndex + 1;
+      loadSlide(currentSlideIndex, false);
+      saveHistorySnapshot();
+    }
+
+    function deleteCurrentSlide() {
+      if (isVisualEditing) toggleVisualEdit();
+      if (slides.length <= 1) {
+        alert("Debe quedar al menos una diapositiva en la lección.");
+        return;
+      }
+      slides.splice(currentSlideIndex, 1);
+      currentSlideIndex = Math.min(currentSlideIndex, slides.length - 1);
+      loadSlide(currentSlideIndex, false);
+      saveHistorySnapshot();
+    }
+
+    // AJUSTES
+    function handleProviderChange() {
+      const provider = document.getElementById('aiProviderSelect').value;
+      const modelInput = document.getElementById('aiModelInput');
+      const keyInput = document.getElementById('aiApiKeyInput');
+      const help = document.getElementById('modelHelpText');
+
+      if (provider === 'openrouter') {
+        modelInput.value = 'openai/gpt-4o-mini';
+        keyInput.placeholder = 'sk-or-v1-...';
+        help.innerHTML = 'Recomendados OpenRouter: <code>openai/gpt-4o-mini</code> o <code>google/gemini-2.5-flash</code>';
+      } else {
+        modelInput.value = 'gemini-3.5-flash-lite';
+        keyInput.placeholder = 'AIzaSy...';
+        help.innerHTML = 'Recomendado Google: <code>gemini-3.5-flash-lite</code> o <code>gemini-3.5-flash</code>';
+      }
+    }
+
+    function openSettingsModal() {
+      document.getElementById('aiProviderSelect').value = getSavedProvider();
+      document.getElementById('aiApiKeyInput').value = getSavedKey();
+      document.getElementById('aiModelInput').value = getSavedModel();
+      document.getElementById('settingsModal').classList.remove('hidden');
+    }
+    function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
+
+    function saveSettings() {
+      const provider = document.getElementById('aiProviderSelect').value;
+      const key = document.getElementById('aiApiKeyInput').value.trim();
+      const model = document.getElementById('aiModelInput').value.trim();
+
+      if (!key) { alert("Ingresa tu API Key."); return; }
+      if (!model) { alert("Ingresa el identificador del modelo."); return; }
+
+      localStorage.setItem('ai_provider', provider);
+      localStorage.setItem('ai_api_key', key);
+      localStorage.setItem('ai_model', model);
+
+      updateBadge();
+      closeSettingsModal();
+      alert("¡Ajustes de IA guardados!");
+    }
+
+    // GESTIÓN DE RECORTES & PEGADO MULTIMODAL (FOTOS ALUMNO + OCR REFERENCIA)
+    function openGenerateModal() {
+      setActivePasteTarget('student');
+      updateStudentImagesGallery();
+      updateReferenceImagesGallery();
+      updateBadge();
+
+      // Forzar que el checkbox de refinamiento inicie SIEMPRE desmarcado
+      const refineCheckbox = document.getElementById('refineSlideCheckbox');
+      if (refineCheckbox) refineCheckbox.checked = false;
+
+      checkRefinementModeAvailability();
+      document.getElementById('generateModal').classList.remove('hidden');
+    }
+    function closeGenerateModal() {
+      if (currentAiAbortController) {
+        try {
+          currentAiAbortController.abort();
+        } catch (e) {}
+        currentAiAbortController = null;
+      }
+      document.getElementById('generateModal').classList.add('hidden');
+    }
+
+    function handleGenerateModalCancel() {
+      if (currentAiAbortController) {
+        try {
+          currentAiAbortController.abort();
+        } catch (e) {
+          console.warn("Error al abortar generación IA:", e);
+        }
+        currentAiAbortController = null;
+        document.getElementById('aiLoadingIndicator').classList.add('hidden');
+        document.getElementById('generateAiBtn').disabled = false;
+        console.log("Generación cancelada por el usuario");
+        return;
+      }
+      closeGenerateModal();
+    }
+
+    function clearGenerateModalAll() {
+      if (currentAiAbortController) {
+        try { currentAiAbortController.abort(); } catch (e) {}
+        currentAiAbortController = null;
+      }
+      if (studentImages.length > 0 || referenceImages.length > 0 || currentAudioBase64) {
+        if (!confirm("¿Deseas vaciar todas las fotos, recortes OCR, audios e instrucciones del modal?")) return;
+      }
+      studentImages = [];
+      referenceImages = [];
+      removeAudio();
+      const scriptInput = document.getElementById('audioScriptInput');
+      if (scriptInput) scriptInput.value = "";
+      const instInput = document.getElementById('optionalInstructions');
+      if (instInput) instInput.value = "";
+      const refineCheckbox = document.getElementById('refineSlideCheckbox');
+      if (refineCheckbox) refineCheckbox.checked = false;
+      toggleRefineModeUI();
+      updateStudentImagesGallery();
+      updateReferenceImagesGallery();
+      setActivePasteTarget('student');
+    }
+
+    function checkRefinementModeAvailability() {
+      const container = document.getElementById('refineModeContainer');
+      const checkbox = document.getElementById('refineSlideCheckbox');
+      const slideNumEl = document.getElementById('refineSlideNum');
+      const currentSlide = slides[currentSlideIndex];
+
+      const isCurrentEmpty = !currentSlide || 
+                             !currentSlide.html || 
+                             currentSlide.html.trim() === '' || 
+                             currentSlide.html.includes('emptySlidePlaceholder') || 
+                             currentSlide.html.includes('Diapositiva en blanco') || 
+                             currentSlide.title === 'Diapositiva Vacía';
+
+      if (container && checkbox) {
+        // La casilla debe iniciar obligatoriamente desmarcada bajo cualquier circunstancia
+        checkbox.checked = false;
+        if (!isCurrentEmpty) {
+          container.classList.remove('hidden');
+          if (slideNumEl) slideNumEl.textContent = currentSlideIndex + 1;
+        } else {
+          container.classList.add('hidden');
+        }
+      }
+      toggleRefineModeUI();
+    }
+
+    function toggleRefineModeUI() {
+      const checkbox = document.getElementById('refineSlideCheckbox');
+      const btn = document.getElementById('generateAiBtn');
+      const input = document.getElementById('optionalInstructions');
+      if (checkbox && checkbox.checked) {
+        if (btn) btn.textContent = '🔄 Refinar Diapositiva Actual';
+        if (input) input.placeholder = "Indica los ajustes. Ej: Corrige la pregunta 2, haz los botones más grandes, cambia el fondo...";
+      } else {
+        if (btn) btn.textContent = 'Generar Diapositiva';
+        if (input) input.placeholder = "Ej: La imagen 1 es referencia; crea interactivo únicamente el ejercicio 1b con selectores.";
+      }
+    }
+
+    function setActivePasteTarget(target) {
+      activePasteTarget = (target === 'reference') ? 'reference' : 'student';
+      activeImageDropzone = activePasteTarget;
+
+      const studentBox = document.getElementById('studentBoxContainer');
+      const referenceBox = document.getElementById('referenceBoxContainer');
+      const studentBadge = document.getElementById('studentActiveBadge');
+      const referenceBadge = document.getElementById('referenceActiveBadge');
+
+      if (activePasteTarget === 'student') {
+        if (studentBox) {
+          studentBox.classList.add('ring-2', 'ring-indigo-500', 'shadow-md');
+        }
+        if (referenceBox) {
+          referenceBox.classList.remove('ring-2', 'ring-amber-500', 'shadow-md');
+        }
+        if (studentBadge) studentBadge.classList.remove('hidden');
+        if (referenceBadge) referenceBadge.classList.add('hidden');
+      } else {
+        if (studentBox) {
+          studentBox.classList.remove('ring-2', 'ring-indigo-500', 'shadow-md');
+        }
+        if (referenceBox) {
+          referenceBox.classList.add('ring-2', 'ring-amber-500', 'shadow-md');
+        }
+        if (studentBadge) studentBadge.classList.add('hidden');
+        if (referenceBadge) referenceBadge.classList.remove('hidden');
+      }
+    }
+
+    // GESTIÓN LOCAL DE AUDIO (0 TOKENS)
+    function handleAudioSelected(e) {
+      const file = e.target.files && e.target.files[0];
+      if (!file) return;
+      processAudioFile(file);
+    }
+
+    function handleAudioDrop(e) {
+      e.preventDefault();
+      const zone = document.getElementById('audioDropZone');
+      if (zone) zone.classList.remove('border-indigo-500', 'bg-indigo-50/70');
+      const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (file && file.type.startsWith('audio/')) {
+        processAudioFile(file);
+      }
+    }
+
+    function processAudioFile(file) {
+      const reader = new FileReader();
+      reader.onload = evt => {
+        currentAudioBase64 = evt.target.result;
+        currentAudioName = file.name;
+        updateAudioUI(file.name, file.size);
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeAudio() {
+      currentAudioBase64 = null;
+      currentAudioName = '';
+      const fileInput = document.getElementById('audioFileInput');
+      if (fileInput) fileInput.value = '';
+      updateAudioUI();
+    }
+
+    function updateAudioUI(fileName, fileSize) {
+      const dropZone = document.getElementById('audioDropZone');
+      const loadedDisplay = document.getElementById('audioLoadedDisplay');
+      const nameEl = document.getElementById('audioFileName');
+      const sizeEl = document.getElementById('audioFileSize');
+      const preview = document.getElementById('audioLocalPreview');
+
+      if (currentAudioBase64 && fileName) {
+        if (dropZone) dropZone.classList.add('hidden');
+        if (loadedDisplay) loadedDisplay.classList.remove('hidden');
+        if (nameEl) nameEl.textContent = fileName;
+        if (sizeEl) sizeEl.textContent = `${(fileSize / 1024).toFixed(1)} KB • En memoria local`;
+        if (preview) {
+          preview.src = currentAudioBase64;
+          preview.load();
+        }
+      } else {
+        if (dropZone) dropZone.classList.remove('hidden');
+        if (loadedDisplay) loadedDisplay.classList.add('hidden');
+        if (preview) preview.src = '';
+      }
+    }
+
+    // PEGADO GLOBAL (CTRL + V) EN LA CAJA ACTIVA
+    function handleGlobalPaste(e) {
+      const modal = document.getElementById('generateModal');
+      if (!modal || modal.classList.contains('hidden')) return;
+
+      const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData) || window.clipboardData;
+      if (!clipboardData || !clipboardData.items) return;
+
+      const items = clipboardData.items;
+      let imagePasted = false;
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file' && item.type.startsWith('image/')) {
+          imagePasted = true;
+          const blob = item.getAsFile();
+          if (blob) {
+            if (activePasteTarget === 'reference') {
+              processReferenceImageFile(blob, `Recorte OCR pegado #${referenceImages.length + 1}`);
+            } else {
+              processStudentImageFile(blob, `Foto pegada #${studentImages.length + 1}`);
+            }
+          }
+        }
+      }
+
+      if (imagePasted) {
+        e.preventDefault();
+      }
+    }
+
+    // --- CAJA 1: FOTOS DEL ALUMNO ---
+    function handleStudentFilesSelected(e) {
+      setActivePasteTarget('student');
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach(file => processStudentImageFile(file, file.name));
+      e.target.value = '';
+    }
+
+    function handleStudentImageDrop(e) {
+      e.preventDefault();
+      setActivePasteTarget('student');
+      const zone = document.getElementById('pasteZoneStudent');
+      if (zone) zone.classList.remove('border-indigo-600', 'bg-indigo-50');
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) processStudentImageFile(file, file.name);
+      });
+    }
+
+    function processStudentImageFile(file, fallbackName) {
+      const reader = new FileReader();
+      reader.onload = evt => {
+        const dataUrl = evt.target.result;
+        const parts = dataUrl.split(',');
+        const mimeType = parts[0].match(/:(.*?);/)[1];
+        const rawData = parts[1];
+
+        studentImages.push({
+          name: fallbackName || `Foto #${studentImages.length + 1}`,
+          dataUrl: dataUrl,
+          mimeType: mimeType,
+          rawData: rawData
+        });
+        updateStudentImagesGallery();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeStudentImage(index) {
+      studentImages.splice(index, 1);
+      updateStudentImagesGallery();
+    }
+
+    function clearStudentImages() {
+      studentImages = [];
+      updateStudentImagesGallery();
+    }
+
+    function updateStudentImagesGallery() {
+      const gallery = document.getElementById('studentImagesPreviewGallery');
+      const countBadge = document.getElementById('studentImagesCountBadge');
+      const clearBtn = document.getElementById('clearStudentImagesBtn');
+
+      countBadge.textContent = studentImages.length;
+
+      if (studentImages.length === 0) {
+        gallery.innerHTML = `<p id="noStudentImagesNotice" class="col-span-full text-center text-xs text-slate-400 py-2.5">Aún no has agregado fotos del ejercicio.</p>`;
+        clearBtn.classList.add('hidden');
+        return;
+      }
+
+      clearBtn.classList.remove('hidden');
+      gallery.innerHTML = '';
+
+      studentImages.forEach((img, idx) => {
+        const card = document.createElement('div');
+        card.className = "relative group rounded-lg overflow-hidden border border-indigo-200 bg-white shadow-xs flex flex-col";
+        card.innerHTML = `
+          <div class="h-20 bg-slate-100 flex items-center justify-center overflow-hidden">
+            <img src="${img.dataUrl}" class="w-full h-full object-cover">
+          </div>
+          <div class="p-1 flex items-center justify-between text-[11px] bg-indigo-50/50">
+            <span class="truncate font-bold text-indigo-900 max-w-[100px]" title="${img.name}">{{STUDENT_IMG_${idx + 1}}}</span>
+            <button type="button" onclick="event.stopPropagation(); removeStudentImage(${idx})" class="text-rose-500 hover:text-rose-700 p-0.5 font-bold" title="Eliminar foto">✕</button>
+          </div>
+        `;
+        gallery.appendChild(card);
+      });
+    }
+
+    // --- CAJA 2: RECORTES DE REFERENCIA OCR ---
+    function handleReferenceFilesSelected(e) {
+      setActivePasteTarget('reference');
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach(file => processReferenceImageFile(file, file.name));
+      e.target.value = '';
+    }
+
+    function handleReferenceImageDrop(e) {
+      e.preventDefault();
+      setActivePasteTarget('reference');
+      const zone = document.getElementById('pasteZoneReference');
+      if (zone) zone.classList.remove('border-amber-600', 'bg-amber-50');
+      const files = e.dataTransfer && e.dataTransfer.files;
+      if (!files || files.length === 0) return;
+      Array.from(files).forEach(file => {
+        if (file.type.startsWith('image/')) processReferenceImageFile(file, file.name);
+      });
+    }
+
+    function processReferenceImageFile(file, fallbackName) {
+      const reader = new FileReader();
+      reader.onload = evt => {
+        const dataUrl = evt.target.result;
+        const parts = dataUrl.split(',');
+        const mimeType = parts[0].match(/:(.*?);/)[1];
+        const rawData = parts[1];
+
+        referenceImages.push({
+          name: fallbackName || `Recorte OCR #${referenceImages.length + 1}`,
+          dataUrl: dataUrl,
+          mimeType: mimeType,
+          rawData: rawData
+        });
+        updateReferenceImagesGallery();
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeReferenceImage(index) {
+      referenceImages.splice(index, 1);
+      updateReferenceImagesGallery();
+    }
+
+    function clearReferenceImages() {
+      referenceImages = [];
+      updateReferenceImagesGallery();
+    }
+
+    function updateReferenceImagesGallery() {
+      const gallery = document.getElementById('referenceImagesPreviewGallery');
+      const countBadge = document.getElementById('referenceImagesCountBadge');
+      const clearBtn = document.getElementById('clearReferenceImagesBtn');
+
+      countBadge.textContent = referenceImages.length;
+
+      if (referenceImages.length === 0) {
+        gallery.innerHTML = `<p id="noReferenceImagesNotice" class="col-span-full text-center text-xs text-slate-400 py-2.5">Aún no has agregado recortes de referencia OCR.</p>`;
+        clearBtn.classList.add('hidden');
+        return;
+      }
+
+      clearBtn.classList.remove('hidden');
+      gallery.innerHTML = '';
+
+      referenceImages.forEach((img, idx) => {
+        const card = document.createElement('div');
+        card.className = "relative group rounded-lg overflow-hidden border border-amber-200 bg-white shadow-xs flex flex-col";
+        card.innerHTML = `
+          <div class="h-20 bg-slate-100 flex items-center justify-center overflow-hidden">
+            <img src="${img.dataUrl}" class="w-full h-full object-cover">
+          </div>
+          <div class="p-1 flex items-center justify-between text-[11px] bg-amber-50/50">
+            <span class="truncate font-semibold text-amber-900 max-w-[100px]" title="${img.name}">OCR #${idx + 1}</span>
+            <button type="button" onclick="event.stopPropagation(); removeReferenceImage(${idx})" class="text-rose-500 hover:text-rose-700 p-0.5 font-bold" title="Eliminar recorte">✕</button>
+          </div>
+        `;
+        gallery.appendChild(card);
+      });
+    }
+
+    // GENERAR CON IA HÍBRIDA (OPENROUTER / GOOGLE AI STUDIO)
+    async function runAiGeneration() {
+      const apiKey = getSavedKey();
+      if (!apiKey) {
+        alert("Falta configurar tu API Key. Abre 'IA' en la barra superior.");
+        openSettingsModal();
+        return;
+      }
+
+      const audioScript = (document.getElementById('audioScriptInput')?.value || '').trim();
+      const extraNotes = document.getElementById('optionalInstructions').value.trim();
+      const isRefining = !!document.getElementById('refineSlideCheckbox')?.checked && !!slides[currentSlideIndex]?.html;
+
+      if (!isRefining && studentImages.length === 0 && referenceImages.length === 0 && !audioScript && !extraNotes) {
+        alert("Por favor sube fotos del ejercicio, recortes de referencia del libro, un Audio Script o escribe instrucciones.");
+        return;
+      }
+
+      if (isRefining && !extraNotes && studentImages.length === 0 && referenceImages.length === 0) {
+        alert("Por favor escribe una indicación de corrección en 'Instrucción específica para la IA' para refinar la diapositiva.");
+        return;
+      }
+
+      const provider = getSavedProvider();
+      const activeModel = getSavedModel();
+      const hasAudioMp3 = !!currentAudioBase64;
+
+      document.getElementById('aiLoadingIndicator').classList.remove('hidden');
+      document.getElementById('generateAiBtn').disabled = true;
+
+      let refinementDirectives = "";
+      if (isRefining) {
+        let currentCleanHtml = (slides[currentSlideIndex]?.html || '');
+        if (currentAudioBase64) {
+          currentCleanHtml = currentCleanHtml.replaceAll(currentAudioBase64, '{{AUDIO_PLACEHOLDER}}');
+        }
+        studentImages.forEach((img, idx) => {
+          if (img.dataUrl) {
+            currentCleanHtml = currentCleanHtml.replaceAll(img.dataUrl, `{{STUDENT_IMG_${idx + 1}}}`);
+          }
+        });
+        currentCleanHtml = currentCleanHtml.replace(/(<audio[^>]*\ssrc=["'])data:audio\/[^"']+(["'])/gi, '$1{{AUDIO_PLACEHOLDER}}$2');
+        currentCleanHtml = currentCleanHtml.replace(/(<source[^>]*\ssrc=["'])data:audio\/[^"']+(["'])/gi, '$1{{AUDIO_PLACEHOLDER}}$2');
+        currentCleanHtml = currentCleanHtml.replace(/(<img[^>]*\ssrc=["'])data:image\/[^"']+(["'])/gi, '$1{{STUDENT_IMG_1}}$2');
+
+        refinementDirectives = `
+========================================
+MODO REFINAMIENTO (AJUSTE SOBRE LA DIAPOSITIVA ACTUAL):
+El usuario solicita modificar o perfeccionar la diapositiva existente sin reconstruirla desde cero.
+
+CÓDIGO ACTUAL:
+"""html
+${currentCleanHtml}
+"""
+
+INSTRUCCIÓN DE CORRECCIÓN:
+${extraNotes || "Pule la interactividad, estilos y responsividad manteniendo intacta la estructura base."}
+
+TAREA: Devuelve el HTML corregido manteniendo intacta la estructura y los marcadores de imágenes {{STUDENT_IMG_N}} y audio existentes.
+Aplica con total precisión las modificaciones solicitadas (redacción, diseño, lógica o interactividad) preservando los estilos Tailwind y la ergonomía táctil.
+========================================\n`;
+      }
+
+      let audioDirectives = "";
+      if (hasAudioMp3 || audioScript) {
+        audioDirectives = `
+A. DIRECTRICES DE AUDIO PEDAGÓGICO:
+${hasAudioMp3 ? `- REGLA CRÍTICA DE AUDIO: La etiqueta de audio DEBE llevar obligatoriamente src="{{AUDIO_PLACEHOLDER}}". Está ESTRICTAMENTE PROHIBIDO inventar URLs externas, enlaces de google actions o dummy URLs.
+- REGLA DE CABECERA STICKY SUPERIOR OBLIGATORIA (top-0): El reproductor de audio DEBE colocarse SIEMPRE en la cabecera adhesiva superior de la actividad:
+  <div class="sticky top-0 bg-white/95 backdrop-blur z-20 py-2.5 px-4 border-b border-slate-200 w-full mb-4 shadow-sm">
+    <audio id="lessonAudio" controls class="w-full" src="{{AUDIO_PLACEHOLDER}}"></audio>
+  </div>
+  Está PROHIBIDO colocar el reproductor al final o en secciones intermedias donde se pierda al hacer scroll.
+- REGLA DE REPRODUCTOR BLOQUEADO: El reproductor DEBE SER SIEMPRE VISIBLE en pantalla desde el inicio. NUNCA uses 'hidden' ni 'display: none' en el reproductor ni en su contenedor. Si la actividad es de tipo 'Listen and check' (autoverificación), el contenedor del reproductor debe mostrarse atenuado y bloqueado (usando clases Tailwind: 'opacity-40 pointer-events-none select-none') junto a un mensaje con icono de candado. Al hacer clic en 'Check Answers', el código JS DEBE remover 'opacity-40 pointer-events-none' para reactivarlo y cambiar el mensaje a '🎧 Now listen and check your answers'.
+- Si se proporciona un Audio Script o se indica que hay audio:
+  * Inserta el reproductor en la cabecera sticky top-0 usando exactamente: <audio id="lessonAudio" controls class="w-full" src="{{AUDIO_PLACEHOLDER}}"></audio>.
+  * Dinámica 1 (Listening simultáneo): Cabecera sticky top-0 fija arriba para escuchar mientras se responden las preguntas.
+  * Dinámica 2 (Matching audio a imagen): Diseña tarjetas con imágenes y selectores/fichas para emparejar cada conversación con su letra correspondiente.
+  * Dinámica 3 (Audio-as-Answer-Key / Autoverificación posterior): Sigue estrictamente la REGLA DE REPRODUCTOR BLOQUEADO en cabecera sticky top-0: visible pero bloqueado al inicio ('opacity-40 pointer-events-none select-none'); al pulsar "Check Answers", se desbloquea con el mensaje "🎧 Now listen and check your answers" y se habilita un botón colapsable para ver la transcripción (Audio Script).` : `- Si no se adjuntó MP3 pero sí hay Audio Script:
+  * La diapositiva debe usar la Web Speech API nativa del navegador (window.speechSynthesis) para lectura auditiva nativa.
+  * Inserta un botón interactivo estilizado con icono SVG en cabecera sticky top-0: '🔊 Listen to Audio' (al pulsar, invoca window.speechSynthesis.speak(new SpeechSynthesisUtterance(...)) con lang='en-US' y rate=0.9).
+  * Incluye un botón colapsable para ver la transcripción.`}
+${audioScript ? `
+AUDIO SCRIPT / TRANSCRIPCIÓN DEL LIBRO (TEXTO OFICIAL):
+"""
+${audioScript}
+"""
+Utiliza esta transcripción para formular las preguntas, opciones de matching, fill-in-the-blanks o autoverificación.` : ''}`;
+      }
+
+      let imagesContext = "";
+      if (studentImages.length > 0) {
+        imagesContext += `
+IMÁGENES PARA EL ALUMNO (Renderizables en el ejercicio):
+Se han subido ${studentImages.length} foto(s) de actividad que los alumnos DEBEN ver en la pantalla.
+DEBES incrustarlas obligatoriamente usando sus marcadores:
+${studentImages.map((img, i) => `* Foto ${i + 1} (${img.name}): usar marcador <img src="{{STUDENT_IMG_${i + 1}}}" alt="Photo ${String.fromCharCode(65 + i)}" class="h-36 md:h-44 w-full object-cover rounded-xl shadow-sm">`).join('\n')}\n`;
+      }
+
+      if (referenceImages.length > 0) {
+        imagesContext += `
+RECORTES DE REFERENCIA (Solo lectura / OCR para la IA):
+Se han subido ${referenceImages.length} recorte(s) de apoyo de texto (enunciados, transcripciones o respuestas del libro).
+Úsalos ÚNICAMENTE para extraer el contenido, preguntas y la verdad de las respuestas.
+NUNCA incrustes estas imágenes de referencia en el código HTML.\n`;
+      }
+
+      const visualDirectives = `
+B. DIRECTRICES DE IMÁGENES E ICONOGRAFÍA:
+- REGLA DE IMÁGENES: Solo debes incrustar en etiquetas <img> las imágenes de 'Fotos del Alumno' usando <img src="{{STUDENT_IMG_1}}">, <img src="{{STUDENT_IMG_2}}">, etc. NUNCA incrustes imágenes de texto o recortes de referencia OCR en el HTML.
+  Está TERMINANTEMENTE PROHIBIDO crear divs grises o cajas con textos tipo 'photo A', 'photo 1', 'img placeholder', así como usar URLs externas de Unsplash cuando haya fotos del alumno provistas.
+- TRATAMIENTO VISUAL: Aplica clases Tailwind a las fotos para máxima nitidez: 'h-36 md:h-44 w-full object-cover rounded-xl shadow-sm'.
+- Iconos funcionales: Usa iconos SVG inline limpios (estilo Lucide/Heroicons) en botones y títulos de sección (auriculares para listening, bocadillos de diálogo, bombilla de ayuda).
+- Ergonomía Móvil Estricta: En pantallas pequeñas, apila siempre las imágenes o reproductores en la parte superior con altura contenida (h-40 a h-52), dejando libre el espacio inferior para que los botones interactivos táctiles (mínimo 42px de alto) nunca se desborden horizontalmente.`;
+
+      const systemPrompt = `Eres un diseñador instruccional experto en inglés (ELT) y desarrollador frontend especializado en interfaces táctiles y responsive.
+${isRefining ? 'Tu tarea es REFINAR y corregir el código HTML de la diapositiva actual según las instrucciones del usuario.' : 'Analiza las fotos del ejercicio, los recortes de referencia OCR y/o el audio script y genera una micro-aplicación interactiva completa en un ÚNICO archivo HTML5 autocontenido para iframe sandbox.'}
+
+${refinementDirectives}
+REGLAS DE RESPONSIVIDAD Y EXPERIENCIA MÓVIL (ESTRICTO):
+1. Incluye en el <head>: <meta name="viewport" content="width=device-width, initial-scale=1.0"> y Tailwind CSS CDN (<script src="https://cdn.tailwindcss.com"><\/script>).
+2. Enfoque Mobile-First: diseña para pantallas desde 360px de ancho hasta escritorio.
+   - En móviles, organiza el contenido en una sola columna vertical fluida (w-full p-3 md:p-6).
+   - REGLA STICKY TOP-0: El reproductor de audio DEBE colocarse SIEMPRE al inicio en la cabecera adhesiva superior (sticky top-0 bg-white/95 backdrop-blur z-20 py-2.5 px-4 border-b w-full mb-4 shadow-sm), de modo que permanezca visible al hacer scroll.
+   - Si hay texto de lectura + preguntas, en móvil la lectura va arriba con scroll suave o acordeón, NUNCA dividida en dos columnas apretadas en pantallas pequeñas.
+   - En pantallas pequeñas, apila siempre las imágenes o reproductores en la parte superior con altura contenida (h-40 a h-52), dejando libre el espacio inferior para que los botones interactivos táctiles (mínimo 42px de alto) nunca se desborden horizontalmente.
+3. Ergonomía Táctil:
+   - Todo elemento interactivo (botones T/F/DS, selectores, fichas de palabras) debe tener un área táctil mínima de 42px de alto (mínimo py-2 px-3) con espacios suficientes (gap-2) para evitar toques accidentales.
+   - Tipografía legible sin zoom: mínimo 14px (text-sm) para textos y 15-16px para inputs/selects para evitar el auto-zoom de iOS.
+4. Lógica Pedagógica y Calificación:
+   - Si hay un Answer Key, úsalo como verdad absoluta sin revelar respuestas de antemano.
+   - Botón "Check Answers" que coloree aciertos en verde (#059669) y errores en rojo (#dc2626).
+   - Botón "Reset" funcional.
+   - Contador Score: X / Y y emisión de evento: window.parent.postMessage({ type: 'ACTIVITY_SCORE', score: correctCount, total: totalCount }, '*');
+${imagesContext}
+${audioDirectives}
+${visualDirectives}
+5. Devuelve EXCLUSIVAMENTE el código HTML completo desde <!DOCTYPE html> hasta </html>, sin backticks markdown ni textos fuera del HTML.
+${!isRefining && extraNotes ? `\nNOTA ADICIONAL DEL PROFESOR: ${extraNotes}` : ''}`;
+
+      try {
+        currentAiAbortController = new AbortController();
+        let generatedHtml = "";
+
+        if (provider === 'openrouter') {
+          // OpenRouter API (OpenAI Chat Completions Format)
+          const content = [{ type: "text", text: systemPrompt }];
+          
+          studentImages.forEach((img, idx) => {
+            content.push({
+              type: "text",
+              text: `[FOTO ALUMNO #${idx + 1} (${img.name}) - Renderizar con {{STUDENT_IMG_${idx + 1}}}]`
+            });
+            content.push({
+              type: "image_url",
+              image_url: { url: img.dataUrl }
+            });
+          });
+
+          referenceImages.forEach((img, idx) => {
+            content.push({
+              type: "text",
+              text: `[RECORTE OCR REFERENCIA #${idx + 1} (${img.name}) - Solo lectura, NO renderizar en HTML]`
+            });
+            content.push({
+              type: "image_url",
+              image_url: { url: img.dataUrl }
+            });
+          });
+
+          const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${apiKey}`,
+              "Content-Type": "application/json",
+              "HTTP-Referer": "https://eltdeck.studio",
+              "X-Title": "ELT Deck Studio"
+            },
+            body: JSON.stringify({
+              model: activeModel,
+              messages: [{ role: "user", content: content }],
+              temperature: 0.2
+            }),
+            signal: currentAiAbortController.signal
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error?.message || `Error OpenRouter HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          generatedHtml = data.choices[0].message.content.trim();
+
+        } else {
+          // Google AI Studio API (Gemini Native Format)
+          const parts = [{ text: systemPrompt }];
+
+          studentImages.forEach((img, idx) => {
+            parts.push({ text: `[FOTO ALUMNO #${idx + 1} (${img.name}) - Renderizar con {{STUDENT_IMG_${idx + 1}}}]` });
+            parts.push({
+              inline_data: { mime_type: img.mimeType, data: img.rawData }
+            });
+          });
+
+          referenceImages.forEach((img, idx) => {
+            parts.push({ text: `[RECORTE OCR REFERENCIA #${idx + 1} (${img.name}) - Solo lectura, NO renderizar en HTML]` });
+            parts.push({
+              inline_data: { mime_type: img.mimeType, data: img.rawData }
+            });
+          });
+
+          const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`;
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: parts }],
+              generationConfig: { temperature: 0.2 }
+            }),
+            signal: currentAiAbortController.signal
+          });
+
+          if (!response.ok) {
+            const errData = await response.json();
+            throw new Error(errData.error?.message || `Error Google HTTP ${response.status}`);
+          }
+
+          const data = await response.json();
+          generatedHtml = data.candidates[0].content.parts[0].text.trim();
+        }
+
+        if (generatedHtml.startsWith("```html")) {
+          generatedHtml = generatedHtml.replace(/^```html\s*/i, "").replace(/\s*```$/i, "").trim();
+        } else if (generatedHtml.startsWith("```")) {
+          generatedHtml = generatedHtml.replace(/^```\s*/i, "").replace(/\s*```$/i, "").trim();
+        }
+
+        // LÓGICA LOCAL DE CONVERSIÓN DE AUDIO (CLIENT-SIDE, 0 TOKENS)
+        if (currentAudioBase64) {
+          // 1. Reemplazo del placeholder estándar
+          generatedHtml = generatedHtml.replaceAll('{{AUDIO_PLACEHOLDER}}', currentAudioBase64);
+          
+          // 2. Fallback robusto: si la IA puso una URL ficticia en <audio ... src="...">
+          generatedHtml = generatedHtml.replace(/(<audio[^>]*\ssrc=["'])([^"']*)(["'])/gi, `$1${currentAudioBase64}$3`);
+          
+          // 3. Fallback para <source src="..."> si la IA usó sub-etiquetas
+          generatedHtml = generatedHtml.replace(/(<source[^>]*\ssrc=["'])([^"']*)(["'])/gi, `$1${currentAudioBase64}$3`);
+        } else {
+          generatedHtml = generatedHtml.replaceAll('{{AUDIO_PLACEHOLDER}}', '');
+        }
+
+        // REEMPLAZO DETERMINISTA Y EXACTO DE FOTOS PARA EL ALUMNO (0 TOKENS)
+        studentImages.forEach((img, idx) => {
+          const b64 = img.dataUrl || img;
+          generatedHtml = generatedHtml.replaceAll(`{{STUDENT_IMG_${idx + 1}}}`, b64);
+          generatedHtml = generatedHtml.replaceAll(`{{IMAGE_${idx + 1}}}`, b64);
+          generatedHtml = generatedHtml.replaceAll(`{{STUDENT_IMAGE_${idx + 1}}}`, b64);
+        });
+
+        // Reemplazo secuencial de rescate SOLO para studentImages si la IA inventó src ficticios en <img>
+        if (studentImages.length > 0) {
+          let seqIdx = 0;
+          generatedHtml = generatedHtml.replace(/(<img\b[^>]*?\bsrc=["'])([^"']*)(["'][^>]*>)/gi, (match, prefix, srcVal, suffix) => {
+            if (srcVal.startsWith('data:image/')) return match;
+            if (seqIdx < studentImages.length) {
+              const b64 = studentImages[seqIdx].dataUrl || studentImages[seqIdx];
+              seqIdx++;
+              return `${prefix}${b64}${suffix}`;
+            }
+            return match;
+          });
+
+          const firstB64 = studentImages[0].dataUrl || studentImages[0];
+          generatedHtml = generatedHtml.replaceAll('{{IMAGE_PLACEHOLDER}}', firstB64);
+        }
+
+        // 1. Detección de título sugerido en el HTML generado
+        let extractedTitle = null;
+        const titleMatch = generatedHtml.match(/<title[^>]*>([^<]+)<\/title>/i);
+        if (titleMatch && titleMatch[1].trim() && !titleMatch[1].toLowerCase().includes('untitled')) {
+          extractedTitle = titleMatch[1].trim();
+        } else {
+          const hMatch = generatedHtml.match(/<h[12][^>]*>([^<]+)<\/h[12]>/i);
+          if (hMatch && hMatch[1].trim()) {
+            extractedTitle = hMatch[1].trim().replace(/\s+/g, ' ').slice(0, 35);
+          }
+        }
+
+        // 2. Detección de diapositiva vacía actual
+        const currentSlide = slides[currentSlideIndex];
+        const isCurrentEmpty = !currentSlide || 
+                               !currentSlide.html || 
+                               currentSlide.html.trim() === '' || 
+                               currentSlide.html.includes('emptySlidePlaceholder') || 
+                               currentSlide.html.includes('Diapositiva en blanco') || 
+                               currentSlide.title === 'Diapositiva Vacía';
+
+        // 3. Lógica de asignación según modo e inserción
+        if (isRefining) {
+          // Modo refinamiento: actualiza la diapositiva actual directamente
+          slides[currentSlideIndex].html = generatedHtml;
+          if (extractedTitle) slides[currentSlideIndex].title = extractedTitle;
+          closeGenerateModal();
+          renderSlideList();
+          renderCurrentSlide();
+          pushUndoSnapshot();
+        } else if (isCurrentEmpty && currentSlide) {
+          // Si la diapositiva actual está vacía, se asigna DIRECTAMENTE sin crear una huérfana
+          slides[currentSlideIndex].html = generatedHtml;
+          slides[currentSlideIndex].title = extractedTitle || `Diapositiva ${currentSlideIndex + 1}`;
+          closeGenerateModal();
+          renderSlideList();
+          renderCurrentSlide();
+          pushUndoSnapshot();
+        } else {
+          // Si la diapositiva actual tiene contenido real, se crea una NUEVA diapositiva a continuación
+          const newSlideIndex = currentSlideIndex + 1;
+          const newSlide = {
+            id: Date.now(),
+            title: extractedTitle || `Actividad IA #${slides.length + 1}`,
+            html: generatedHtml
+          };
+          slides.splice(newSlideIndex, 0, newSlide);
+          closeGenerateModal();
+          currentSlideIndex = newSlideIndex;
+          renderSlideList();
+          renderCurrentSlide();
+          pushUndoSnapshot();
+        }
+
+      } catch (err) {
+        if (err.name === 'AbortError' || err.message?.includes('aborted')) {
+          console.log("Generación cancelada por el usuario");
+        } else {
+          alert("Error al generar: " + err.message);
+        }
+      } finally {
+        currentAiAbortController = null;
+        document.getElementById('aiLoadingIndicator').classList.add('hidden');
+        document.getElementById('generateAiBtn').disabled = false;
+      }
+    }
+
+    // EDITOR DE CÓDIGO
+    function openCodeModal() {
+      if (isVisualEditing) toggleVisualEdit();
+      document.getElementById('codeEditorArea').value = slides[currentSlideIndex].html;
+      document.getElementById('codeModal').classList.remove('hidden');
+    }
+    function closeCodeModal() { document.getElementById('codeModal').classList.add('hidden'); }
+
+    function saveCodeModalChanges() {
+      slides[currentSlideIndex].html = document.getElementById('codeEditorArea').value;
+      closeCodeModal();
+      loadSlide(currentSlideIndex, false);
+      saveHistorySnapshot();
+    }
+
+    // ==========================================
+    // EXPORTACIÓN A HTML PARA ALUMNOS (BASE64)
+    // ==========================================
+    async function exportDeckPackage() {
+      if (isVisualEditing) toggleVisualEdit();
+
+      // Sincronizar título desde el input si fue editado
+      const inputEl = document.getElementById('lessonTitleInput');
+      if (inputEl && inputEl.value.trim()) {
+        currentLessonTitle = inputEl.value.trim();
+      }
+
+      const jsonStr = JSON.stringify(slides);
+      const encodedDeckData = btoa(unescape(encodeURIComponent(jsonStr)));
+      const escapedTitle = currentLessonTitle.replace(/"/g, '&quot;');
+
+      const standaloneHtml = '<!DOCTYPE html>\n' +
+'<html lang="en">\n' +
+'<head>\n' +
+'  <meta charset="UTF-8">\n' +
+'  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">\n' +
+'  <title>' + escapedTitle + '</title>\n' +
+'  <script src="https://cdn.tailwindcss.com"><' + '/script>\n' +
+'  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">\n' +
+'  <style>\n' +
+'    body { font-family: "Plus Jakarta Sans", sans-serif; -webkit-tap-highlight-color: transparent; }\n' +
+'    iframe { width: 100%; height: 100%; border: 0; -webkit-overflow-scrolling: touch; }\n' +
+'    netlify-drawer, #netlify-drawer, [data-netlify-drawer], .netlify-badge {\n' +
+'      display: none !important;\n' +
+'      visibility: hidden !important;\n' +
+'      pointer-events: none !important;\n' +
+'    }\n' +
+'  </style>\n' +
+'</head>\n' +
+'<body class="bg-slate-900 text-white h-screen flex flex-col justify-between overflow-hidden select-none">\n' +
+'  <header class="px-3 md:px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0 z-10 gap-2">\n' +
+'    <div class="flex items-center min-w-0">\n' +
+'      <a href="index.html" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-lg transition mr-3 shrink-0">\n' +
+'        <span>← Menú</span>\n' +
+'      </a>\n' +
+'      <span class="text-xs font-bold text-slate-300 truncate max-w-[150px] sm:max-w-[280px] md:max-w-none">' + escapedTitle + '</span>\n' +
+'    </div>\n' +
+'    <div id="counter" class="text-xs font-mono font-bold bg-slate-800 px-3 py-1 rounded-full text-indigo-300 shrink-0">1 / 1</div>\n' +
+'  </header>\n' +
+'  <main class="flex-1 p-1 md:p-3 overflow-hidden flex flex-col relative">\n' +
+'    <div class="flex-1 bg-white rounded-xl overflow-hidden shadow-2xl relative">\n' +
+'      <iframe id="viewer" sandbox="allow-scripts allow-modals"></iframe>\n' +
+'    </div>\n' +
+'  </main>\n' +
+'  <footer class="relative z-50 p-2.5 pb-6 sm:pb-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between shrink-0 gap-2" style="z-index: 9999; padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));">\n' +
+'    <button onclick="prev()" class="flex-1 md:flex-initial px-5 py-2.5 bg-slate-800 active:bg-slate-700 text-xs font-bold rounded-xl transition text-center">← Prev</button>\n' +
+'    <span class="hidden md:inline text-[11px] text-slate-400">Swipe or use arrows to navigate</span>\n' +
+'    <button onclick="next()" class="flex-1 md:flex-initial px-6 py-2.5 bg-indigo-600 active:bg-indigo-700 text-xs font-bold rounded-xl transition text-center shadow-md">Next →</button>\n' +
+'  </footer>\n' +
+'  <script>\n' +
+'    const payload = "' + encodedDeckData + '";\n' +
+'    const deck = JSON.parse(decodeURIComponent(escape(atob(payload))));\n' +
+'    let current = 0;\n' +
+'    function show(idx) {\n' +
+'      if (idx < 0 || idx >= deck.length) return;\n' +
+'      current = idx;\n' +
+'      document.getElementById("viewer").srcdoc = deck[current].html;\n' +
+'      document.getElementById("counter").textContent = (current + 1) + " / " + deck.length;\n' +
+'    }\n' +
+'    function prev() { if (current > 0) show(current - 1); }\n' +
+'    function next() { if (current < deck.length - 1) show(current + 1); }\n' +
+'    window.addEventListener("keydown", e => {\n' +
+'      if (e.key === "ArrowLeft") prev();\n' +
+'      if (e.key === "ArrowRight" || e.key === " ") next();\n' +
+'    });\n' +
+'    let touchStartX = 0;\n' +
+'    let touchEndX = 0;\n' +
+'    document.body.addEventListener("touchstart", e => { touchStartX = e.changedTouches[0].screenX; }, {passive: true});\n' +
+'    document.body.addEventListener("touchend", e => {\n' +
+'      touchEndX = e.changedTouches[0].screenX;\n' +
+'      if (touchStartX - touchEndX > 60) next();\n' +
+'      if (touchEndX - touchStartX > 60) prev();\n' +
+'    }, {passive: true});\n' +
+'    show(0);\n' +
+'  <' + '/script>\n' +
+'</body>\n' +
+'</html>';
+
+      if ('showSaveFilePicker' in window) {
+        try {
+          const suggestedName = `${sanitizeFilename(currentLessonTitle)}_alumnos.html`;
+          const handle = await window.showSaveFilePicker({
+            id: 'elt_interactive_lessons_dir', // Memoria nativa persistente de carpeta
+            suggestedName: suggestedName,
+            types: [{
+              description: 'Paquete de Lección para Alumnos (*.html)',
+              accept: { 'text/html': ['.html', '.htm'] }
+            }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(standaloneHtml);
+          await writable.close();
+          alert(`¡Lección para alumnos exportada con éxito en:\n${handle.name}`);
+          return;
+        } catch (err) {
+          if (err.name === 'AbortError') return;
+          console.warn("Falló acceso a File System API para exportar, usando descarga tradicional:", err);
+        }
+      }
+
+      const blob = new Blob([standaloneHtml], { type: 'text/html;charset=utf-8' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `${sanitizeFilename(currentLessonTitle)}_alumnos.html`;
+      a.click();
+    }
+  </script>
+</body>
+</html>
