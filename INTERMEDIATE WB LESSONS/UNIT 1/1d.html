@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Int WB U1 Lesson 1D</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
@@ -16,7 +16,7 @@
     }
   </style>
 </head>
-<body class="bg-slate-900 text-white h-screen flex flex-col justify-between overflow-hidden select-none">
+<body class="bg-slate-900 text-white h-screen h-[100dvh] flex flex-col justify-between overflow-hidden select-none">
   <header class="px-3 md:px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between shrink-0 z-10 gap-2">
     <div class="flex items-center min-w-0">
       <a href="index.html" class="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-white bg-slate-800/80 hover:bg-slate-700 border border-slate-700 rounded-lg transition mr-3 shrink-0">
@@ -26,12 +26,12 @@
     </div>
     <div id="counter" class="text-xs font-mono font-bold bg-slate-800 px-3 py-1 rounded-full text-indigo-300 shrink-0">1 / 1</div>
   </header>
-  <main class="flex-1 p-1 md:p-3 overflow-hidden flex flex-col relative">
+  <main class="flex-1 p-1 md:p-3 pb-24 md:pb-24 overflow-hidden flex flex-col relative">
     <div class="flex-1 bg-white rounded-xl overflow-hidden shadow-2xl relative">
       <iframe id="viewer" sandbox="allow-scripts allow-modals"></iframe>
     </div>
   </main>
-  <footer class="relative z-50 p-2.5 pb-6 sm:pb-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between shrink-0 gap-2" style="z-index: 9999; padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));">
+  <footer class="fixed bottom-0 left-0 right-0 z-[9999] bg-slate-900/95 backdrop-blur border-t border-slate-800 p-3 flex items-center justify-between gap-2" style="z-index: 9999; padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));">
     <button onclick="prev()" class="flex-1 md:flex-initial px-5 py-2.5 bg-slate-800 active:bg-slate-700 text-xs font-bold rounded-xl transition text-center">← Prev</button>
     <span class="hidden md:inline text-[11px] text-slate-400">Swipe or use arrows to navigate</span>
     <button onclick="next()" class="flex-1 md:flex-initial px-6 py-2.5 bg-indigo-600 active:bg-indigo-700 text-xs font-bold rounded-xl transition text-center shadow-md">Next →</button>
