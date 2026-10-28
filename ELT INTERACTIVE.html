@@ -76,8 +76,8 @@
         <span>Como...</span>
       </button>
 
-      <!-- Edición Visual Directa -->
-      <button id="visualEditBtn" onclick="toggleVisualEdit()" class="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition shadow-sm" title="Editar textos directamente en la pantalla">
+      <!-- Edición Visual Directa / Inspector Q&A -->
+      <button id="visualEditBtn" onclick="handleEditTextsClick()" class="flex items-center gap-1 px-2.5 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-lg text-xs font-bold transition shadow-sm" title="Editar textos o auditar preguntas y respuestas">
         <svg class="w-4 h-4 text-amber-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
         <span id="visualEditBtnText">Editar Textos</span>
       </button>
@@ -425,6 +425,49 @@
     </div>
   </div>
 
+  <!-- MODAL: INSPECTOR DE PREGUNTAS Y RESPUESTAS (Q&A INSPECTOR) -->
+  <div id="qaInspectorModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[90vh]">
+      <!-- Encabezado -->
+      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
+            🔍
+          </div>
+          <div>
+            <h3 class="font-bold text-slate-900 text-sm md:text-base">Inspector de Preguntas y Respuestas</h3>
+            <p class="text-xs text-slate-500">Audita y corrige las preguntas y respuestas esperadas de la diapositiva activa.</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" onclick="switchToVisualEditFromModal()" class="text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 shadow-xs" title="Alternar al modo de edición libre de textos en pantalla">
+            <span>✏️ Modo Edición Libre</span>
+          </button>
+          <button onclick="closeQaInspectorModal()" class="text-slate-400 hover:text-slate-600 p-1" title="Cerrar inspector">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Contenedor de Tarjetas de Preguntas -->
+      <div id="qaInspectorList" class="p-4 md:p-6 space-y-4 overflow-y-auto flex-1 bg-slate-50">
+        <!-- Renderizado dinámicamente -->
+      </div>
+
+      <!-- Pie del Modal -->
+      <div class="p-3 md:p-4 bg-white border-t border-slate-200 flex items-center justify-between gap-3">
+        <span id="qaInspectorCount" class="text-xs font-medium text-slate-500">0 preguntas detectadas</span>
+        <div class="flex items-center gap-2">
+          <button onclick="closeQaInspectorModal()" class="px-4 py-2 text-xs font-bold text-slate-600 hover:text-slate-800">Cancelar</button>
+          <button onclick="saveQaInspectorChanges()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-bold shadow-sm transition flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <span>Guardar Cambios</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- INPUT OCULTO PARA FALLBACK DE ABRIR ARCHIVO -->
   <input type="file" id="legacyFileInput" accept=".eltdeck,.html,.json" class="hidden" onchange="handleLegacyFileLoad(event)">
 
@@ -659,6 +702,471 @@
       renderSlideList();
       renderCurrentSlide();
       setDirty(false);
+    }
+
+    // ==========================================
+    // INSPECTOR DE PREGUNTAS Y RESPUESTAS (Q&A)
+    // ==========================================
+    let currentQaItems = [];
+
+    function escapeHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function handleEditTextsClick() {
+      if (isVisualEditing) {
+        toggleVisualEdit();
+      } else {
+        openTextOrQaInspector();
+      }
+    }
+
+    function openTextOrQaInspector() {
+      const iframe = document.getElementById('slideViewer');
+      let iframeDoc = null;
+      try {
+        iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+      } catch (e) {
+        alert("No se puede acceder al visor por restricciones de seguridad del navegador.");
+        return;
+      }
+
+      if (!iframeDoc || !iframeDoc.body) {
+        alert("La diapositiva aún no ha cargado completamente.");
+        return;
+      }
+
+      const items = inspectSlideInteractiveElements(iframeDoc);
+
+      if (!items || items.length === 0) {
+        // Si no hay preguntas interactivas estructuradas, activar el editor de texto visual libre (designMode)
+        toggleVisualEdit();
+        return;
+      }
+
+      currentQaItems = items;
+      renderQaInspectorModal();
+      document.getElementById('qaInspectorModal').classList.remove('hidden');
+    }
+
+    function closeQaInspectorModal() {
+      document.getElementById('qaInspectorModal').classList.add('hidden');
+      currentQaItems = [];
+    }
+
+    function switchToVisualEditFromModal() {
+      closeQaInspectorModal();
+      if (!isVisualEditing) {
+        toggleVisualEdit();
+      }
+    }
+
+    function inspectSlideInteractiveElements(doc) {
+      if (!doc || !doc.body) return [];
+
+      let scriptAnswerKey = {};
+      try {
+        const scripts = doc.querySelectorAll('script');
+        scripts.forEach(s => {
+          const txt = s.textContent || '';
+          const match = txt.match(/(?:const|let|var)\s+(?:answerKey|answers|correctAnswers)\s*=\s*(\{[\s\S]*?\});/);
+          if (match) {
+            try {
+              const fn = new Function('return ' + match[1] + ';');
+              const res = fn();
+              if (res && typeof res === 'object') Object.assign(scriptAnswerKey, res);
+            } catch (err) {}
+          }
+        });
+      } catch (e) {}
+
+      const items = [];
+      const processedElements = new Set();
+
+      function getPromptText(el, defaultTitle) {
+        if (el.id) {
+          const lbl = doc.querySelector(`label[for="${el.id}"]`);
+          if (lbl && lbl.textContent.trim()) {
+            return { text: lbl.textContent.trim(), node: lbl };
+          }
+        }
+        const parentLabel = el.closest('label');
+        if (parentLabel && parentLabel.textContent.trim()) {
+          return { text: parentLabel.textContent.trim(), node: parentLabel };
+        }
+        const p = el.closest('p, div.leading-relaxed');
+        if (p && p.textContent.trim().length > 0) {
+          const clone = p.cloneNode(true);
+          const interactiveInClone = clone.querySelectorAll('input, select, button');
+          if (interactiveInClone.length > 0) {
+            interactiveInClone.forEach(node => {
+              const isTarget = (el.id && node.id === el.id) || (node.tagName === el.tagName && node.textContent === el.textContent);
+              const repl = doc.createTextNode(isTarget ? ' [ ___ ] ' : ' [ ... ] ');
+              if (node.parentNode) node.parentNode.replaceChild(repl, node);
+            });
+            const cleanText = clone.textContent.replace(/\s+/g, ' ').trim();
+            if (cleanText.length > 3) {
+              return { text: cleanText, node: p };
+            }
+          }
+        }
+        const container = el.closest('[data-item], [data-question], .item, .question-card, .exercise-item, tr, li, .bg-white, form > div');
+        if (container) {
+          const promptEl = container.querySelector('.question-text, .prompt, h2, h3, h4, .font-bold, .font-medium, span.font-semibold');
+          if (promptEl && promptEl !== el && !promptEl.contains(el) && promptEl.textContent.trim()) {
+            return { text: promptEl.textContent.trim(), node: promptEl };
+          }
+        }
+        let prev = el.previousSibling;
+        while (prev) {
+          if (prev.textContent && prev.textContent.trim().length > 1) {
+            return { text: prev.textContent.trim(), node: prev };
+          }
+          prev = prev.previousSibling;
+        }
+        return { text: defaultTitle || (el.id ? `Elemento (#${el.id})` : 'Pregunta del ejercicio'), node: null };
+      }
+
+      // 1. SELECTS
+      const selects = doc.querySelectorAll('select');
+      selects.forEach((sel, idx) => {
+        processedElements.add(sel);
+        const options = Array.from(sel.querySelectorAll('option')).map(opt => ({
+          value: opt.value,
+          text: opt.textContent.trim()
+        }));
+
+        let expected = sel.getAttribute('data-answer') || sel.getAttribute('data-ans') || sel.getAttribute('data-correct') || '';
+        if (!expected && sel.id && scriptAnswerKey[sel.id]) {
+          expected = String(scriptAnswerKey[sel.id]);
+        }
+        if (!expected) {
+          const markedOpt = sel.querySelector('option[data-correct="true"], option[data-answer="true"]');
+          if (markedOpt) expected = markedOpt.value;
+          else if (sel.value && sel.value !== '') expected = sel.value;
+        }
+
+        const promptInfo = getPromptText(sel, `Selector #${idx + 1}`);
+
+        items.push({
+          type: 'select',
+          badge: '🔽 Desplegable',
+          element: sel,
+          id: sel.id || null,
+          prompt: promptInfo.text,
+          promptNode: promptInfo.node,
+          expectedAnswer: expected,
+          options: options,
+          attrName: sel.hasAttribute('data-ans') ? 'data-ans' : 'data-answer'
+        });
+      });
+
+      // 2. INPUTS DE TEXTO
+      const inputs = doc.querySelectorAll('input:not([type="button"]):not([type="submit"]):not([type="reset"]):not([type="hidden"]):not([type="file"]):not([type="checkbox"]):not([type="radio"])');
+      inputs.forEach((inp, idx) => {
+        let expected = inp.getAttribute('data-answer') || inp.getAttribute('data-ans') || inp.getAttribute('data-correct') || inp.getAttribute('data-expected') || '';
+        if (!expected && inp.id && scriptAnswerKey[inp.id]) {
+          const kv = scriptAnswerKey[inp.id];
+          expected = Array.isArray(kv) ? kv.join(' | ') : String(kv);
+        }
+
+        const isExerciseInput = inp.hasAttribute('data-answer') || inp.hasAttribute('data-ans') || inp.hasAttribute('data-correct') ||
+          (inp.id && scriptAnswerKey[inp.id]) ||
+          inp.classList.contains('input-gap') || inp.classList.contains('gap-input') || inp.classList.contains('answer-input') ||
+          inp.closest('form, [data-item], [data-question], .exercise-item');
+
+        if (isExerciseInput) {
+          processedElements.add(inp);
+          const promptInfo = getPromptText(inp, `Pregunta de texto #${idx + 1}`);
+          items.push({
+            type: 'text',
+            badge: '📝 Input de Texto',
+            element: inp,
+            id: inp.id || null,
+            prompt: promptInfo.text,
+            promptNode: promptInfo.node,
+            expectedAnswer: expected,
+            options: [],
+            attrName: inp.hasAttribute('data-ans') ? 'data-ans' : 'data-answer'
+          });
+        }
+      });
+
+      // 3. BOTONES / GRUPOS DE OPCIÓN MÚLTIPLE / TRUE-FALSE-DS
+      const questionGroups = {};
+      const buttonsWithQ = doc.querySelectorAll('button[data-question], button[data-item], button[data-q]');
+      buttonsWithQ.forEach(btn => {
+        const qKey = btn.getAttribute('data-question') || btn.getAttribute('data-item') || btn.getAttribute('data-q');
+        if (!questionGroups[qKey]) questionGroups[qKey] = [];
+        questionGroups[qKey].push(btn);
+        processedElements.add(btn);
+      });
+
+      const tfContainers = doc.querySelectorAll('.options-group, .choice-group, .btn-group, [id^="options-"], div[class*="grid-cols"]');
+      tfContainers.forEach((cont, cIdx) => {
+        const btns = Array.from(cont.querySelectorAll('button:not(#check-btn):not(#reset-btn):not([onclick*="toggle"]):not([onclick*="check"]):not([onclick*="reset"])'));
+        if (btns.length >= 2 && btns.every(b => !processedElements.has(b))) {
+          const looksLikeChoice = btns.every(b => b.textContent.trim().length < 40);
+          if (looksLikeChoice) {
+            const qKey = `group_${cIdx}`;
+            questionGroups[qKey] = btns;
+            btns.forEach(b => processedElements.add(b));
+          }
+        }
+      });
+
+      Object.keys(questionGroups).forEach((qKey, gIdx) => {
+        const btns = questionGroups[qKey];
+        if (btns.length === 0) return;
+
+        let expected = '';
+        if (scriptAnswerKey[qKey]) {
+          const val = scriptAnswerKey[qKey];
+          expected = Array.isArray(val) ? val.join(' | ') : String(val);
+        }
+        if (!expected) {
+          btns.forEach(b => {
+            if (b.getAttribute('data-answer') === 'true' || b.getAttribute('data-correct') === 'true' || b.hasAttribute('data-correct')) {
+              expected = b.getAttribute('data-option') || b.textContent.trim();
+            }
+          });
+        }
+
+        const options = btns.map(b => ({
+          value: b.getAttribute('data-option') || b.getAttribute('data-value') || b.textContent.trim(),
+          text: b.textContent.trim()
+        }));
+
+        const promptInfo = getPromptText(btns[0], `Pregunta de opción múltiple #${gIdx + 1}`);
+
+        items.push({
+          type: 'choice',
+          badge: '🔘 Selección / T-F-DS',
+          qKey: qKey,
+          buttons: btns,
+          prompt: promptInfo.text,
+          promptNode: promptInfo.node,
+          expectedAnswer: expected,
+          options: options
+        });
+      });
+
+      return items;
+    }
+
+    function renderQaInspectorModal() {
+      const listEl = document.getElementById('qaInspectorList');
+      const countEl = document.getElementById('qaInspectorCount');
+      if (!listEl) return;
+
+      countEl.textContent = `${currentQaItems.length} ${currentQaItems.length === 1 ? 'pregunta detectada' : 'preguntas detectadas'}`;
+      listEl.innerHTML = '';
+
+      currentQaItems.forEach((item, idx) => {
+        const card = document.createElement('div');
+        card.className = "bg-white rounded-xl p-4 border border-slate-200 shadow-xs space-y-3";
+
+        const headDiv = document.createElement('div');
+        headDiv.className = "flex items-center justify-between border-b border-slate-100 pb-2.5";
+        headDiv.innerHTML = `
+          <div class="flex items-center gap-2">
+            <span class="px-2 py-0.5 rounded-md text-xs font-black bg-indigo-100 text-indigo-700">#${idx + 1}</span>
+            <span class="text-xs font-bold text-slate-600">${escapeHtml(item.badge)}</span>
+          </div>
+          ${item.id || item.qKey ? `<span class="text-[11px] font-mono text-slate-400 bg-slate-50 px-2 py-0.5 rounded border border-slate-100">id: ${escapeHtml(item.id || item.qKey)}</span>` : ''}
+        `;
+        card.appendChild(headDiv);
+
+        const promptDiv = document.createElement('div');
+        promptDiv.className = "space-y-1";
+        promptDiv.innerHTML = `
+          <label class="block text-xs font-bold text-slate-700">Enunciado / Pregunta / Pista:</label>
+          <input type="text" id="qa-prompt-${idx}" class="w-full text-xs p-2 rounded-lg border border-slate-200 font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none bg-slate-50/60 transition" value="${escapeHtml(item.prompt)}">
+        `;
+        card.appendChild(promptDiv);
+
+        const ansDiv = document.createElement('div');
+        ansDiv.className = "space-y-1.5 pt-1";
+
+        const validOptions = item.options ? item.options.filter(o => o.value && o.value.trim()) : [];
+
+        let pillsHtml = '';
+        if (validOptions.length > 0) {
+          pillsHtml = `
+            <div class="flex flex-wrap gap-1.5 pt-1" id="qa-pills-${idx}">
+              ${validOptions.map(opt => {
+                const isSelected = opt.value.toLowerCase() === (item.expectedAnswer || '').toLowerCase();
+                const pillClass = isSelected
+                  ? "bg-emerald-600 text-white border-emerald-600 shadow-xs"
+                  : "bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200";
+                return `<button type="button" onclick="setQaAnswerPill(${idx}, '${escapeHtml(opt.value)}')" class="qa-pill-${idx} px-2.5 py-1 rounded-lg text-xs font-bold border transition ${pillClass}">${escapeHtml(opt.text || opt.value)}</button>`;
+              }).join('')}
+            </div>
+          `;
+        }
+
+        ansDiv.innerHTML = `
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-bold text-emerald-800 flex items-center gap-1">
+              <span>✅ Respuesta Correcta Esperada:</span>
+            </label>
+            ${validOptions.length > 0 ? `<span class="text-[11px] text-slate-400">Clic en una opción o edita directamente:</span>` : ''}
+          </div>
+          <div class="relative">
+            <input type="text" id="qa-answer-${idx}" oninput="handleQaAnswerInput(${idx})" class="w-full text-xs font-bold p-2.5 rounded-lg border border-emerald-300 bg-emerald-50/40 text-emerald-900 focus:ring-2 focus:ring-emerald-500 focus:outline-none transition" value="${escapeHtml(item.expectedAnswer)}" placeholder="Escribe la respuesta correcta esperada...">
+          </div>
+          ${pillsHtml}
+        `;
+        card.appendChild(ansDiv);
+
+        listEl.appendChild(card);
+      });
+    }
+
+    function setQaAnswerPill(idx, val) {
+      const input = document.getElementById('qa-answer-' + idx);
+      if (input) {
+        input.value = val;
+        handleQaAnswerInput(idx);
+      }
+    }
+
+    function handleQaAnswerInput(idx) {
+      const input = document.getElementById('qa-answer-' + idx);
+      if (!input) return;
+      const currentVal = input.value.trim().toLowerCase();
+      const pills = document.querySelectorAll(`.qa-pill-${idx}`);
+      pills.forEach(pill => {
+        const pillText = pill.textContent.trim().toLowerCase();
+        if (pillText === currentVal) {
+          pill.className = `qa-pill-${idx} px-2.5 py-1 rounded-lg text-xs font-bold border transition bg-emerald-600 text-white border-emerald-600 shadow-xs`;
+        } else {
+          pill.className = `qa-pill-${idx} px-2.5 py-1 rounded-lg text-xs font-bold border transition bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200`;
+        }
+      });
+    }
+
+    function saveQaInspectorChanges() {
+      const iframe = document.getElementById('slideViewer');
+      if (!iframe) return;
+      let doc = null;
+      try {
+        doc = iframe.contentDocument || iframe.contentWindow.document;
+      } catch (e) {
+        alert("No se pudo acceder a la diapositiva para guardar.");
+        return;
+      }
+
+      let updatedScriptKeys = {};
+      let hasScriptKeyUpdates = false;
+
+      currentQaItems.forEach((item, idx) => {
+        const promptInput = document.getElementById('qa-prompt-' + idx);
+        const answerInput = document.getElementById('qa-answer-' + idx);
+        if (!answerInput) return;
+
+        const newPrompt = promptInput ? promptInput.value.trim() : '';
+        const newAns = answerInput.value.trim();
+
+        // 1. Actualizar texto de pregunta si cambió
+        if (newPrompt && item.promptNode && newPrompt !== item.prompt) {
+          if (item.promptNode.nodeType === 1) {
+            if (!item.promptNode.querySelector('select, input, button')) {
+              item.promptNode.textContent = newPrompt;
+            }
+          }
+        }
+
+        // 2. Actualizar respuesta esperada según el tipo
+        if (item.type === 'select') {
+          const sel = item.element;
+          if (sel) {
+            sel.setAttribute(item.attrName || 'data-answer', newAns);
+            let optExists = false;
+            sel.querySelectorAll('option').forEach(opt => {
+              if (opt.value.toLowerCase() === newAns.toLowerCase()) {
+                optExists = true;
+                opt.setAttribute('data-correct', 'true');
+              } else {
+                opt.removeAttribute('data-correct');
+              }
+            });
+            if (!optExists && newAns) {
+              const newOpt = doc.createElement('option');
+              newOpt.value = newAns;
+              newOpt.textContent = newAns;
+              newOpt.setAttribute('data-correct', 'true');
+              sel.appendChild(newOpt);
+            }
+          }
+          if (item.id) {
+            updatedScriptKeys[item.id] = newAns;
+            hasScriptKeyUpdates = true;
+          }
+        } else if (item.type === 'text') {
+          const inp = item.element;
+          if (inp) {
+            inp.setAttribute(item.attrName || 'data-answer', newAns);
+          }
+          if (item.id) {
+            updatedScriptKeys[item.id] = newAns;
+            hasScriptKeyUpdates = true;
+          }
+        } else if (item.type === 'choice') {
+          if (item.buttons && item.buttons.length > 0) {
+            item.buttons.forEach(btn => {
+              const optVal = btn.getAttribute('data-option') || btn.getAttribute('data-value') || btn.textContent.trim();
+              const isMatch = optVal.toLowerCase() === newAns.toLowerCase();
+              btn.setAttribute('data-answer', isMatch ? 'true' : 'false');
+              if (isMatch) btn.setAttribute('data-correct', 'true');
+              else btn.removeAttribute('data-correct');
+            });
+          }
+          if (item.qKey) {
+            updatedScriptKeys[item.qKey] = newAns;
+            hasScriptKeyUpdates = true;
+          }
+        }
+      });
+
+      let updatedHtml = '<!DOCTYPE html>\n' + doc.documentElement.outerHTML;
+
+      if (hasScriptKeyUpdates) {
+        updatedHtml = updatedHtml.replace(/((?:const|let|var)\s+(?:answerKey|answers|correctAnswers)\s*=\s*)(\{[\s\S]*?\})(\s*;)/, (m, prefix, objStr, suffix) => {
+          try {
+            const fn = new Function('return ' + objStr + ';');
+            const currentObj = fn();
+            if (currentObj && typeof currentObj === 'object') {
+              Object.keys(updatedScriptKeys).forEach(k => {
+                if (currentObj.hasOwnProperty(k) || currentObj.hasOwnProperty(Number(k))) {
+                  const targetKey = currentObj.hasOwnProperty(Number(k)) ? Number(k) : k;
+                  if (Array.isArray(currentObj[targetKey])) {
+                    const parts = updatedScriptKeys[k].split('|').map(s => s.trim()).filter(Boolean);
+                    currentObj[targetKey] = parts.length > 0 ? parts : [updatedScriptKeys[k]];
+                  } else {
+                    currentObj[targetKey] = updatedScriptKeys[k];
+                  }
+                }
+              });
+              return prefix + JSON.stringify(currentObj, null, 8).replace(/\n\s*/g, ' ') + suffix;
+            }
+          } catch (err) {}
+          return m;
+        });
+      }
+
+      slides[currentSlideIndex].html = updatedHtml;
+      saveHistorySnapshot();
+
+      document.getElementById('slideViewer').srcdoc = updatedHtml;
+
+      closeQaInspectorModal();
     }
 
     // ==========================================
