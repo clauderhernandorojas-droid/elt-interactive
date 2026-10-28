@@ -136,7 +136,7 @@
       </div>
 
       <!-- NAVEGACIÓN INFERIOR -->
-      <div class="relative z-50 mt-2.5 pb-4 sm:pb-1 flex items-center justify-between px-2 shrink-0" style="z-index: 9999; padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));">
+      <div class="relative z-30 mt-2.5 pb-4 sm:pb-1 flex items-center justify-between px-2 shrink-0" style="padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));">
         <div class="flex items-center gap-2">
           <button onclick="prevSlide()" class="px-3 py-1.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-bold rounded-lg shadow-sm">
             ← Anterior
@@ -160,7 +160,7 @@
   </div>
 
   <!-- MODAL: GENERAR CON IA (SOPORTE CTRL+V MULTI-RECORTES) -->
-  <div id="generateModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+  <div id="generateModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4" style="z-index: 100000 !important;">
     <div class="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[90vh]">
       <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
         <div class="flex items-center gap-2">
