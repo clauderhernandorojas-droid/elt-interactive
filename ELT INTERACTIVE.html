@@ -2092,13 +2092,31 @@ NUNCA incrustes estas imágenes de referencia en el código HTML.\n`;
       }
 
       const visualDirectives = `
-B. DIRECTRICES DE MAQUETACIÓN, IMÁGENES E ICONOGRAFÍA:
-- MAQUETACIÓN AMPLIA: El contenedor principal de la actividad DEBE configurarse siempre con un ancho amplio y equilibrado: 'w-full max-w-4xl mx-auto' o 'max-w-5xl' (entre 850px y 1000px). Queda estrictamente prohibido usar clases de ancho móvil como 'max-w-md', 'max-w-sm' o 'max-w-xs' en el contenedor raíz.
-- REGLA DE IMÁGENES: Solo debes incrustar en etiquetas <img> las imágenes de 'Fotos del Alumno' usando <img src="{{STUDENT_IMG_1}}">, <img src="{{STUDENT_IMG_2}}">, etc. NUNCA incrustes imágenes de texto o recortes de referencia OCR en el HTML.
-  Está TERMINANTEMENTE PROHIBIDO crear divs grises o cajas con textos tipo 'photo A', 'photo 1', 'img placeholder', así como usar URLs externas de Unsplash cuando haya fotos del alumno provistas.
-- TRATAMIENTO VISUAL: Aplica clases Tailwind a las fotos para máxima nitidez: 'h-36 md:h-44 w-full object-cover rounded-xl shadow-sm'.
-- Iconos funcionales: Usa iconos SVG inline limpios (estilo Lucide/Heroicons) en botones y títulos de sección (auriculares para listening, bocadillos de diálogo, bombilla de ayuda).
-- Ergonomía Móvil Estricta: En pantallas pequeñas, apila siempre las imágenes o reproductores en la parte superior con altura contenida (h-40 a h-52), dejando libre el espacio inferior para que los botones interactivos táctiles (mínimo 42px de alto) nunca se desborden horizontalmente.`;
+--- PRINCIPIOS UNIVERSALES DE DISEÑO EDITORIAL ---
+1. CONTENEDOR Y RESPONSIVIDAD:
+   - Contenedor principal SIEMPRE con 'w-full max-w-4xl mx-auto' o 'max-w-5xl' (850px-1000px) centrado, fondo blanco (#ffffff), bordes suaves y sombra sutil ('border border-slate-200 rounded-2xl shadow-sm').
+   - Adaptación móvil por padding ('p-4 sm:p-6 md:p-8'), NUNCA comprimir el contenedor con clases angostas ('max-w-md', 'max-w-sm').
+   - PROHIBIDO inventar etiquetas <img> si no hay una imagen real provista. Solo debes incrustar en etiquetas <img> las imágenes de 'Fotos del Alumno' usando <img src="{{STUDENT_IMG_1}}">, <img src="{{STUDENT_IMG_2}}">, etc. NUNCA incrustes imágenes de texto o recortes de referencia OCR en el HTML. Está TERMINANTEMENTE PROHIBIDO crear divs grises o cajas con textos tipo 'photo A', 'photo 1', 'img placeholder', así como usar URLs externas cuando haya fotos del alumno provistas.
+   - Aplica clases Tailwind a las fotos para máxima nitidez: 'h-36 md:h-44 w-full object-cover rounded-xl shadow-sm'.
+   - Iconos funcionales: Usa iconos SVG inline limpios (estilo Lucide/Heroicons) en botones y títulos de sección (auriculares para listening, bocadillos de diálogo, bombilla de ayuda).
+   - Ergonomía Móvil Estricta: En pantallas pequeñas, apila siempre las imágenes o reproductores en la parte superior con altura contenida (h-40 a h-52), dejando libre el espacio inferior para que los botones interactivos táctiles (mínimo 42px de alto) nunca se desborden horizontalmente.
+
+2. CRITERIO PEDAGÓGICO Y TOLERANCIA:
+   - Si una actividad requiere consultar un texto largo previo (como un Reading), preséntalo en la parte superior en un acordeón accesible '<details open class="ref-details">' con fondo tenue para no forzar scroll excesivo.
+   - En campos de texto abierto (<input>), incluye siempre el atributo 'data-answer' con la clave principal y, si aplica, alternativas comunes en 'data-alts' o una función normalizeText() en JS que ignore diferencias menores de puntuación/mayúsculas.
+   - Para compatibilidad con el Inspector de Preguntas, CADA input interactivo, select o botón de opción DEBE tener su respectivo 'data-answer'.
+
+--- EJEMPLOS DE REFERENCIA ESTILÍSTICA (FEW-SHOT PATTERNS) ---
+Patrón A (Diálogo / Entrevista estructurada):
+- Tarjetas de turno conversacional con clase 'dialogue-pair', pills identificadores para cada hablante (ej. Sam: sky-100/sky-800, Annie: pink-100/pink-800).
+- Indicaciones y pistas en 'cue-pill' (fondo slate-100, texto slate-600, redondeado, texto pequeño).
+- Inputs de respuesta integrados de forma natural en el flujo del diálogo con ancho adecuado y soporte de validación interactiva.
+
+Patrón B (Lectura / Selección en menú desplegable):
+- Badges numerados para cada hueco o sección (1, 2, 3...) con fondo slate-800 texto blanco.
+- Selects embebidos directamente en el texto o encabezado de sección con opciones barajadas y clase base estilizada.
+- Retroalimentación inmediata con clases '.is-correct' (borde verde, bg verde claro) y '.is-wrong' (borde rojo, bg rojo claro).
+- Botones de acción integrados: '✓ Check Answers' y botón de reinicio '🔄'.`;
 
       const systemPrompt = `Eres un diseñador instruccional experto en inglés (ELT) y desarrollador frontend especializado en interfaces táctiles y responsive.
 ${isRefining ? 'Tu tarea es REFINAR y corregir el código HTML de la diapositiva actual según las instrucciones del usuario.' : 'Analiza las fotos del ejercicio, los recortes de referencia OCR y/o el audio script y genera una micro-aplicación interactiva completa en un ÚNICO archivo HTML5 autocontenido para iframe sandbox.'}
