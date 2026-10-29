@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">Unit 1 - Pre-Intermediate</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between p-4 md:p-8">
+
+  <main class="max-w-4xl w-full mx-auto my-auto">
+    <!-- Volver al portal -->
+    <div class="mb-6">
+      <a href="../index.html" class="inline-flex items-center gap-2 text-xs font-semibold text-indigo-400 hover:text-indigo-300 transition">
+        ← Volver al Portal de Unidades
+      </a>
+    </div>
+
+    <!-- Encabezado reactivo -->
+    <header class="mb-8">
+      <span class="inline-block px-3 py-1 bg-indigo-500/20 text-indigo-400 text-xs font-semibold uppercase tracking-wider rounded-full mb-3 border border-indigo-500/30">
+        Pre-Intermediate Level
+      </span>
+      <h1 id="unitHeading" class="text-3xl md:text-4xl font-extrabold text-white">Unit 1</h1>
+      <p class="text-slate-400 mt-2 text-sm">Selecciona una lección para comenzar:</p>
+    </header>
+
+    <!-- 4 Lecciones -->
+    <div id="lessonsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- Inyectado dinámicamente -->
+    </div>
+  </main>
+
+  <!-- Pie de página con botón de configuración de lecciones -->
+  <footer class="text-center text-xs text-slate-500 mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+    <span>Interactive ELT Deck • Pre-Intermediate</span>
+    <button onclick="openLessonsConfig()" class="text-indigo-400 hover:text-indigo-300 text-[11px] underline cursor-pointer">
+      ⚙️ Configurar Lecciones
+    </button>
+  </footer>
+
+  <!-- Modal Docente: Configurar Nombres de las 4 Lecciones -->
+  <div id="lessonsConfigModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-lg w-full shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <h3 class="text-base font-bold text-white">⚙️ Configurar Lecciones (Unidad 1)</h3>
+        <button onclick="closeLessonsConfig()" class="text-slate-400 hover:text-white text-xl px-2">✕</button>
+      </div>
+
+      <div id="lessonsFormList" class="p-4 space-y-3">
+        <!-- Inputs de lecciones -->
+      </div>
+
+      <div class="p-4 border-t border-slate-800 bg-slate-950/50 flex justify-end gap-2">
+        <button onclick="closeLessonsConfig()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-xl transition">
+          Cancelar
+        </button>
+        <button onclick="saveLessonsConfig()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold rounded-xl transition shadow-lg text-white">
+          Guardar Cambios
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TEACHER_PINS = ['admin123', '6578'];
+    const CURRENT_UNIT_ID = 1; // Cambiar a 2, 3, etc. en otras carpetas
+
+    // Lecciones por defecto
+    const defaultLessons = [
+      { id: '1a', file: '1a.html', label: 'Lesson 1A', title: 'Work, Rest & Play' },
+      { id: '1b', file: '1b.html', label: 'Lesson 1B', title: 'Daily Routines' },
+      { id: '1c', file: '1c.html', label: 'Lesson 1C', title: 'Free Time & Questions' },
+      { id: '1d', file: '1d.html', label: 'Lesson 1D', title: 'Review & Self-Assessment' }
+    ];
+
+    // Sincronizar título de la unidad desde los ajustes del portal principal
+    function syncUnitTitle() {
+      try {
+        const portalTitles = JSON.parse(localStorage.getItem('elt_preint_custom_unit_titles') || '{}');
+        const unitData = portalTitles[CURRENT_UNIT_ID];
+        if (unitData) {
+          const headingText = `${unitData.title}: ${unitData.topic}`;
+          document.getElementById('unitHeading').textContent = headingText;
+          document.getElementById('pageTitle').textContent = `${unitData.title} - Pre-Intermediate`;
+          return;
+        }
+      } catch (e) {}
+      document.getElementById('unitHeading').textContent = `Unit ${CURRENT_UNIT_ID}: Work, Rest & Play`;
+    }
+
+    function getLessons() {
+      try {
+        const saved = localStorage.getItem(`elt_preint_lessons_unit_${CURRENT_UNIT_ID}`);
+        return saved ? JSON.parse(saved) : defaultLessons;
+      } catch (e) {
+        return defaultLessons;
+      }
+    }
+
+    function renderLessons() {
+      const container = document.getElementById('lessonsGrid');
+      const lessons = getLessons();
+      container.innerHTML = '';
+
+      lessons.forEach(lesson => {
+        const card = document.createElement('a');
+        card.href = lesson.file;
+        card.className = "p-5 bg-slate-800/90 border border-slate-700/60 rounded-2xl shadow-lg hover:border-indigo-400 hover:scale-[1.01] transition duration-200 flex items-center justify-between group";
+        card.innerHTML = `
+          <div>
+            <span class="text-xs font-bold text-indigo-400">${lesson.label}</span>
+            <h2 class="text-lg font-bold text-white group-hover:text-indigo-300 transition mt-0.5">${lesson.title}</h2>
+          </div>
+          <span class="text-xs text-indigo-400 font-bold group-hover:translate-x-1 transition">Iniciar →</span>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function openLessonsConfig() {
+      const pin = prompt("Ingresa la clave de docente para configurar las lecciones:");
+      if (!pin || !TEACHER_PINS.includes(pin.trim())) {
+        if (pin) alert("Clave incorrecta.");
+        return;
+      }
+
+      const formList = document.getElementById('lessonsFormList');
+      const lessons = getLessons();
+      formList.innerHTML = '';
+
+      lessons.forEach((l, idx) => {
+        const row = document.createElement('div');
+        row.className = "p-3 bg-slate-800/80 border border-slate-700/60 rounded-xl flex gap-2 items-center";
+        row.innerHTML = `
+          <div class="w-1/3">
+            <label class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Identificador</label>
+            <input type="text" id="lesson_lbl_${idx}" value="${l.label}" class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white outline-none focus:border-indigo-500">
+          </div>
+          <div class="w-2/3">
+            <label class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Título de Lección</label>
+            <input type="text" id="lesson_title_${idx}" value="${l.title}" class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white outline-none focus:border-indigo-500">
+          </div>
+        `;
+        formList.appendChild(row);
+      });
+
+      document.getElementById('lessonsConfigModal').classList.remove('hidden');
+    }
+
+    function closeLessonsConfig() {
+      document.getElementById('lessonsConfigModal').classList.add('hidden');
+    }
+
+    function saveLessonsConfig() {
+      const lessons = getLessons().map((l, idx) => {
+        const lbl = document.getElementById(`lesson_lbl_${idx}`)?.value.trim();
+        const ttl = document.getElementById(`lesson_title_${idx}`)?.value.trim();
+        return {
+          ...l,
+          label: lbl || l.label,
+          title: ttl || l.title
+        };
+      });
+
+      localStorage.setItem(`elt_preint_lessons_unit_${CURRENT_UNIT_ID}`, JSON.stringify(lessons));
+      closeLessonsConfig();
+      renderLessons();
+    }
+
+    // Inicializar
+    syncUnitTitle();
+    renderLessons();
+  </script>
+</body>
+</html>

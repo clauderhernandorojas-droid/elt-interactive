@@ -2092,7 +2092,8 @@ NUNCA incrustes estas imágenes de referencia en el código HTML.\n`;
       }
 
       const visualDirectives = `
-B. DIRECTRICES DE IMÁGENES E ICONOGRAFÍA:
+B. DIRECTRICES DE MAQUETACIÓN, IMÁGENES E ICONOGRAFÍA:
+- MAQUETACIÓN AMPLIA: El contenedor principal de la actividad DEBE configurarse siempre con un ancho amplio y equilibrado: 'w-full max-w-4xl mx-auto' o 'max-w-5xl' (entre 850px y 1000px). Queda estrictamente prohibido usar clases de ancho móvil como 'max-w-md', 'max-w-sm' o 'max-w-xs' en el contenedor raíz.
 - REGLA DE IMÁGENES: Solo debes incrustar en etiquetas <img> las imágenes de 'Fotos del Alumno' usando <img src="{{STUDENT_IMG_1}}">, <img src="{{STUDENT_IMG_2}}">, etc. NUNCA incrustes imágenes de texto o recortes de referencia OCR en el HTML.
   Está TERMINANTEMENTE PROHIBIDO crear divs grises o cajas con textos tipo 'photo A', 'photo 1', 'img placeholder', así como usar URLs externas de Unsplash cuando haya fotos del alumno provistas.
 - TRATAMIENTO VISUAL: Aplica clases Tailwind a las fotos para máxima nitidez: 'h-36 md:h-44 w-full object-cover rounded-xl shadow-sm'.
@@ -2105,15 +2106,20 @@ ${isRefining ? 'Tu tarea es REFINAR y corregir el código HTML de la diapositiva
 ${refinementDirectives}
 REGLAS DE RESPONSIVIDAD Y EXPERIENCIA MÓVIL (ESTRICTO):
 1. Incluye en el <head>: <meta name="viewport" content="width=device-width, initial-scale=1.0"> y Tailwind CSS CDN (<script src="https://cdn.tailwindcss.com"><\/script>).
-2. Enfoque Mobile-First: diseña para pantallas desde 360px de ancho hasta escritorio.
+2. ANCHO Y ESPACIO VISUAL (DESKTOP & MOBILE):
+   - El contenedor principal de la actividad DEBE configurarse siempre con un ancho amplio y equilibrado: 'w-full max-w-4xl mx-auto' o 'max-w-5xl' (entre 850px y 1000px).
+   - QUEDA ESTRICTAMENTE PROHIBIDO usar clases de ancho móvil como 'max-w-md', 'max-w-sm' o 'max-w-xs' en el contenedor raíz de la actividad.
+   - La responsividad para teléfonos móviles se garantiza mediante el ancho fluido ('w-full') y paddings adaptativos ('p-4 sm:p-6 md:p-8'), NUNCA encogiendo la actividad a una columna microscópica en computadores.
+   - En lecturas, diálogos o listas de ejercicios, aprovecha el ancho con cuadrículas responsivas ('grid grid-cols-1 md:grid-cols-2 gap-4') o tarjetas editoriales completas cuando la actividad lo requiera.
+3. Enfoque Mobile-First: diseña para pantallas desde 360px de ancho hasta escritorio.
    - En móviles, organiza el contenido en una sola columna vertical fluida (w-full p-3 md:p-6).
    - REGLA STICKY TOP-0: El reproductor de audio DEBE colocarse SIEMPRE al inicio en la cabecera adhesiva superior (sticky top-0 bg-white/95 backdrop-blur z-20 py-2.5 px-4 border-b w-full mb-4 shadow-sm), de modo que permanezca visible al hacer scroll.
    - Si hay texto de lectura + preguntas, en móvil la lectura va arriba con scroll suave o acordeón, NUNCA dividida en dos columnas apretadas en pantallas pequeñas.
    - En pantallas pequeñas, apila siempre las imágenes o reproductores en la parte superior con altura contenida (h-40 a h-52), dejando libre el espacio inferior para que los botones interactivos táctiles (mínimo 42px de alto) nunca se desborden horizontalmente.
-3. Ergonomía Táctil:
+4. Ergonomía Táctil:
    - Todo elemento interactivo (botones T/F/DS, selectores, fichas de palabras) debe tener un área táctil mínima de 42px de alto (mínimo py-2 px-3) con espacios suficientes (gap-2) para evitar toques accidentales.
    - Tipografía legible sin zoom: mínimo 14px (text-sm) para textos y 15-16px para inputs/selects para evitar el auto-zoom de iOS.
-4. Lógica Pedagógica y Calificación:
+5. Lógica Pedagógica y Calificación:
    - Si hay un Answer Key, úsalo como verdad absoluta sin revelar respuestas de antemano.
    - Botón "Check Answers" que coloree aciertos en verde (#059669) y errores en rojo (#dc2626).
    - Botón "Reset" funcional.
@@ -2121,7 +2127,7 @@ REGLAS DE RESPONSIVIDAD Y EXPERIENCIA MÓVIL (ESTRICTO):
 ${imagesContext}
 ${audioDirectives}
 ${visualDirectives}
-5. Devuelve EXCLUSIVAMENTE el código HTML completo desde <!DOCTYPE html> hasta </html>, sin backticks markdown ni textos fuera del HTML.
+6. Devuelve EXCLUSIVAMENTE el código HTML completo desde <!DOCTYPE html> hasta </html>, sin backticks markdown ni textos fuera del HTML.
 ${!isRefining && extraNotes ? `\nNOTA ADICIONAL DEL PROFESOR: ${extraNotes}` : ''}`;
 
       try {

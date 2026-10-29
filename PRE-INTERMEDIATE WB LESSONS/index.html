@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pre-Intermediate English</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    button { -webkit-tap-highlight-color: transparent; }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col justify-between p-4 md:p-8">
+
+  <main class="max-w-5xl w-full mx-auto my-auto">
+    <!-- Encabezado -->
+    <header class="text-center mb-8">
+      <span class="inline-block px-3 py-1 bg-indigo-500/20 text-indigo-400 text-xs font-semibold uppercase tracking-wider rounded-full mb-3 border border-indigo-500/30">
+        Interactive Course Portal
+      </span>
+      <h1 class="text-3xl md:text-5xl font-extrabold tracking-tight text-white">Pre-Intermediate</h1>
+      <p class="text-slate-400 mt-2 text-sm md:text-base">Selecciona tu unidad para ver las lecciones interactivas</p>
+    </header>
+
+    <!-- Cuadrícula de 12 Unidades -->
+    <div id="unitsGrid" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+      <!-- Inyectado dinámicamente -->
+    </div>
+  </main>
+
+  <!-- Pie de página con Controles Docente -->
+  <footer class="text-center text-xs text-slate-500 mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
+    <span>Interactive ELT Deck • Pre-Intermediate Level</span>
+    <div class="flex items-center gap-3">
+      <button onclick="openConfigModal()" class="text-indigo-400 hover:text-indigo-300 text-[11px] underline cursor-pointer">
+        ⚙️ Configurar Nombres
+      </button>
+      <span class="text-slate-700">•</span>
+      <button onclick="resetLockedUnits()" class="text-slate-600 hover:text-slate-400 text-[11px] underline cursor-pointer">
+        Bloquear todo de nuevo
+      </button>
+    </div>
+  </footer>
+
+  <!-- Modal Docente: Configuración Visual de Nombres -->
+  <div id="unitTitlesModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+    <div class="bg-slate-900 border border-slate-700/80 rounded-2xl max-w-2xl w-full max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+      <div class="p-4 border-b border-slate-800 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-bold text-white">⚙️ Configurar Nombres de Unidades</h3>
+          <p class="text-xs text-slate-400">Edita los títulos y temas visibles en el portal</p>
+        </div>
+        <button onclick="closeConfigModal()" class="text-slate-400 hover:text-white text-xl px-2">✕</button>
+      </div>
+
+      <div id="unitsFormList" class="p-4 overflow-y-auto space-y-3">
+        <!-- Generado dinámicamente -->
+      </div>
+
+      <div class="p-4 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between">
+        <button onclick="restoreDefaultTitles()" class="text-xs text-rose-400 hover:text-rose-300 underline">
+          Restablecer valores por defecto
+        </button>
+        <div class="flex gap-2">
+          <button onclick="closeConfigModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-xs font-bold rounded-xl transition">
+            Cancelar
+          </button>
+          <button onclick="saveConfigTitles()" class="px-5 py-2 bg-indigo-600 hover:bg-indigo-500 text-xs font-bold rounded-xl transition shadow-lg text-white">
+            Guardar Nombres
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const TEACHER_PINS = ['admin123', '6578'];
+
+    // Estructura de 12 Unidades base de Pre-Intermediate
+    const defaultUnits = [
+      { id: 1, title: 'Unit 1', topic: 'Work, Rest & Play', folder: 'UNIT 1' },
+      { id: 2, title: 'Unit 2', topic: 'Beginnings', folder: 'UNIT 2' },
+      { id: 3, title: 'Unit 3', topic: 'The Right Person', folder: 'UNIT 3' },
+      { id: 4, title: 'Unit 4', topic: 'Money & Shopping', folder: 'UNIT 4' },
+      { id: 5, title: 'Unit 5', topic: 'Body & Health', folder: 'UNIT 5' },
+      { id: 6, title: 'Unit 6', topic: 'Modern Living', folder: 'UNIT 6' },
+      { id: 7, title: 'Unit 7', topic: 'Different Worlds', folder: 'UNIT 7' },
+      { id: 8, title: 'Unit 8', topic: 'Good Times, Bad Times', folder: 'UNIT 8' },
+      { id: 9, title: 'Unit 9', topic: 'From A to B', folder: 'UNIT 9' },
+      { id: 10, title: 'Unit 10', topic: 'Going Places', folder: 'UNIT 10' },
+      { id: 11, title: 'Unit 11', topic: 'World of Work', folder: 'UNIT 11' },
+      { id: 12, title: 'Unit 12', topic: 'Life Choices', folder: 'UNIT 12' }
+    ];
+
+    function getCustomTitles() {
+      try {
+        const saved = localStorage.getItem('elt_preint_custom_unit_titles');
+        return saved ? JSON.parse(saved) : {};
+      } catch (e) {
+        return {};
+      }
+    }
+
+    function getUnitsList() {
+      const custom = getCustomTitles();
+      return defaultUnits.map(u => ({
+        ...u,
+        title: custom[u.id]?.title || u.title,
+        topic: custom[u.id]?.topic || u.topic
+      }));
+    }
+
+    function getUnlockedUnits() {
+      try {
+        const saved = localStorage.getItem('elt_preint_unlocked_units');
+        return saved ? JSON.parse(saved) : [1]; // Unit 1 abierta por defecto
+      } catch (e) {
+        return [1];
+      }
+    }
+
+    function saveUnlockedUnits(unlocked) {
+      try {
+        localStorage.setItem('elt_preint_unlocked_units', JSON.stringify(unlocked));
+      } catch (e) {}
+    }
+
+    function renderUnits() {
+      const container = document.getElementById('unitsGrid');
+      if (!container) return;
+      const unlockedIds = getUnlockedUnits();
+      const units = getUnitsList();
+      container.innerHTML = '';
+
+      units.forEach(unit => {
+        const isUnlocked = unlockedIds.includes(unit.id);
+
+        if (isUnlocked) {
+          const card = document.createElement('a');
+          card.href = `${unit.folder}/index.html`;
+          card.className = "group relative p-5 bg-slate-800/90 border border-indigo-500/40 rounded-2xl shadow-lg hover:border-indigo-400 hover:shadow-indigo-500/20 hover:scale-[1.02] transition duration-200 flex flex-col justify-between";
+          card.innerHTML = `
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs font-bold px-2 py-0.5 rounded bg-indigo-500 text-white">4 Lecciones</span>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-indigo-400 group-hover:translate-x-0.5 transition font-bold">Entrar →</span>
+                <button onclick="toggleLock(${unit.id}, event)" title="Bloquear esta unidad con PIN" class="text-emerald-400 hover:text-rose-400 hover:scale-125 transition p-1 text-sm cursor-pointer z-10" aria-label="Bloquear unidad">
+                  🔓
+                </button>
+              </div>
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-white group-hover:text-indigo-300 transition">${unit.title}</h2>
+              <p class="text-xs text-slate-400 mt-1">${unit.topic}</p>
+            </div>
+          `;
+          container.appendChild(card);
+        } else {
+          const card = document.createElement('div');
+          card.className = "p-5 bg-slate-800/40 border border-slate-700/50 rounded-2xl opacity-60 flex flex-col justify-between select-none";
+          card.innerHTML = `
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded bg-slate-700 text-slate-400">Próximamente</span>
+              <button onclick="toggleLock(${unit.id}, event)" title="Desbloquear con PIN de docente" class="text-slate-400 hover:text-amber-400 hover:scale-125 transition p-1 text-sm cursor-pointer" aria-label="Desbloquear unidad">
+                🔒
+              </button>
+            </div>
+            <div>
+              <h2 class="text-xl font-bold text-slate-300">${unit.title}</h2>
+              <p class="text-xs text-slate-500 mt-1">${unit.topic}</p>
+            </div>
+          `;
+          container.appendChild(card);
+        }
+      });
+    }
+
+    function toggleLock(unitId, event) {
+      if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+      }
+
+      let unlocked = getUnlockedUnits();
+      const isCurrentlyUnlocked = unlocked.includes(unitId);
+      const actionMsg = isCurrentlyUnlocked 
+        ? "Ingresa la clave de docente para BLOQUEAR nuevamente esta unidad:" 
+        : "Ingresa la clave de docente para DESBLOQUEAR esta unidad:";
+
+      const pin = prompt(actionMsg);
+      if (!pin) return;
+
+      if (TEACHER_PINS.includes(pin.trim())) {
+        if (isCurrentlyUnlocked) {
+          unlocked = unlocked.filter(id => id !== unitId);
+        } else {
+          unlocked.push(unitId);
+        }
+        saveUnlockedUnits(unlocked);
+        renderUnits();
+      } else {
+        alert("Clave incorrecta.");
+      }
+    }
+
+    function resetLockedUnits() {
+      const pin = prompt("Ingresa la clave de docente para bloquear todas las unidades:");
+      if (!pin || !TEACHER_PINS.includes(pin.trim())) {
+        if (pin) alert("Clave incorrecta.");
+        return;
+      }
+      localStorage.setItem('elt_preint_unlocked_units', JSON.stringify([1]));
+      renderUnits();
+    }
+
+    // Modal de Edición Docente
+    function openConfigModal() {
+      const pin = prompt("Ingresa la clave de docente para editar los nombres:");
+      if (!pin || !TEACHER_PINS.includes(pin.trim())) {
+        if (pin) alert("Clave incorrecta.");
+        return;
+      }
+
+      const listContainer = document.getElementById('unitsFormList');
+      const units = getUnitsList();
+      listContainer.innerHTML = '';
+
+      units.forEach(u => {
+        const row = document.createElement('div');
+        row.className = "p-3 bg-slate-800/80 border border-slate-700/60 rounded-xl flex flex-col sm:flex-row gap-2 items-center";
+        row.innerHTML = `
+          <div class="w-full sm:w-1/3">
+            <label class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Nombre</label>
+            <input type="text" id="cfg_title_${u.id}" value="${u.title}" class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white outline-none focus:border-indigo-500">
+          </div>
+          <div class="w-full sm:w-2/3">
+            <label class="text-[10px] uppercase font-bold text-slate-400 block mb-1">Tema / Subtítulo</label>
+            <input type="text" id="cfg_topic_${u.id}" value="${u.topic}" class="w-full px-2.5 py-1.5 bg-slate-900 border border-slate-700 rounded-lg text-xs text-white outline-none focus:border-indigo-500">
+          </div>
+        `;
+        listContainer.appendChild(row);
+      });
+
+      document.getElementById('unitTitlesModal').classList.remove('hidden');
+    }
+
+    function closeConfigModal() {
+      document.getElementById('unitTitlesModal').classList.add('hidden');
+    }
+
+    function saveConfigTitles() {
+      const custom = {};
+      defaultUnits.forEach(u => {
+        const titleInput = document.getElementById(`cfg_title_${u.id}`); const topicInput = document.getElementById(`cfg_topic_${u.id}`);
+        if (titleInput && topicInput) {
+          custom[u.id] = {
+            title: titleInput.value.trim() || u.title,
+            topic: topicInput.value.trim() || u.topic
+          };
+        }
+      });
+      localStorage.setItem('elt_preint_custom_unit_titles', JSON.stringify(custom));
+      closeConfigModal();
+      renderUnits();
+    }
+
+    function restoreDefaultTitles() {
+      if (confirm("¿Deseas restablecer todos los títulos a sus valores por defecto?")) {
+        localStorage.removeItem('elt_preint_custom_unit_titles');
+        closeConfigModal();
+        renderUnits();
+      }
+    }
+
+    renderUnits();
+  </script>
+</body>
+</html>
