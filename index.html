@@ -429,23 +429,42 @@
   <div id="qaInspectorModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
     <div class="bg-white rounded-2xl max-w-3xl w-full shadow-2xl border border-slate-200 flex flex-col overflow-hidden max-h-[90vh]">
       <!-- Encabezado -->
-      <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-slate-50">
-        <div class="flex items-center gap-2.5">
-          <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
-            🔍
+      <div class="p-4 border-b border-slate-200 bg-slate-50 space-y-3">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2.5">
+            <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center font-bold text-sm">
+              🔍
+            </div>
+            <div>
+              <h3 class="font-bold text-slate-900 text-sm md:text-base">Inspector de Preguntas y Respuestas</h3>
+              <p class="text-xs text-slate-500">Audita y corrige las preguntas, respuestas y métricas de la diapositiva activa.</p>
+            </div>
           </div>
-          <div>
-            <h3 class="font-bold text-slate-900 text-sm md:text-base">Inspector de Preguntas y Respuestas</h3>
-            <p class="text-xs text-slate-500">Audita y corrige las preguntas y respuestas esperadas de la diapositiva activa.</p>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="switchToVisualEditFromModal()" class="text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 shadow-xs" title="Alternar al modo de edición libre de textos en pantalla">
+              <span>✏️ Modo Edición Libre</span>
+            </button>
+            <button onclick="closeQaInspectorModal()" class="text-slate-400 hover:text-slate-600 p-1" title="Cerrar inspector">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
           </div>
         </div>
-        <div class="flex items-center gap-2">
-          <button type="button" onclick="switchToVisualEditFromModal()" class="text-xs font-semibold text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 px-2.5 py-1.5 rounded-lg transition flex items-center gap-1 shadow-xs" title="Alternar al modo de edición libre de textos en pantalla">
-            <span>✏️ Modo Edición Libre</span>
-          </button>
-          <button onclick="closeQaInspectorModal()" class="text-slate-400 hover:text-slate-600 p-1" title="Cerrar inspector">
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-          </button>
+
+        <!-- Campos de Métricas Pedagógicas (Dominio y Microcompetencia) -->
+        <div class="flex flex-wrap items-center gap-3 pt-2.5 border-t border-slate-200/80 text-xs">
+          <div class="flex items-center gap-1.5">
+            <label for="qaDomainSelect" class="font-bold text-slate-700">Dominio:</label>
+            <select id="qaDomainSelect" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none shadow-xs">
+              <option value="Grammar">Grammar</option>
+              <option value="Vocabulary">Vocabulary</option>
+              <option value="Reading">Reading</option>
+              <option value="Listening">Listening</option>
+            </select>
+          </div>
+          <div class="flex items-center gap-1.5 flex-1 min-w-[220px]">
+            <label for="qaSkillInput" class="font-bold text-slate-700">Microcompetencia:</label>
+            <input type="text" id="qaSkillInput" placeholder="ej: present_simple, weekend_activities" class="bg-white border border-slate-300 rounded-lg px-2.5 py-1 text-xs font-mono text-slate-800 focus:ring-2 focus:ring-indigo-500 focus:outline-none flex-1 shadow-xs">
+          </div>
         </div>
       </div>
 
@@ -533,6 +552,11 @@
     </div>
   </div>
   <script>
+    window.ACTIVITY_METRICS = {
+      domain: 'Grammar',
+      skill: 'prepositions_with_adjectives',
+      maxScore: 5
+    };
     function checkAnswers() {
       const selects = document.querySelectorAll('select.select-pill');
       let correct = 0;
@@ -549,6 +573,14 @@
       if (window.parent && window.parent !== window) {
         window.parent.postMessage({ type: 'ACTIVITY_SCORE', score: correct, total: selects.length }, '*');
       }
+      window.dispatchEvent(new CustomEvent('ELT_ACTIVITY_UPDATE', {
+        detail: {
+          metrics: window.ACTIVITY_METRICS,
+          score: correct,
+          total: selects.length,
+          completed: correct === selects.length
+        }
+      }));
     }
     function resetAnswers() {
       document.querySelectorAll('select.select-pill').forEach(sel => {
@@ -708,6 +740,56 @@
     // INSPECTOR DE PREGUNTAS Y RESPUESTAS (Q&A)
     // ==========================================
     let currentQaItems = [];
+    let currentSlideMetrics = {
+      domain: 'Grammar',
+      skill: '',
+      maxScore: 0
+    };
+
+    function normalizeMetrics(m) {
+      const validDomains = ['Grammar', 'Vocabulary', 'Reading', 'Listening'];
+      const foundDomain = validDomains.find(d => d.toLowerCase() === (m.domain || '').trim().toLowerCase());
+      return {
+        domain: foundDomain || 'Grammar',
+        skill: (m.skill || '').trim(),
+        maxScore: Number(m.maxScore) || 0
+      };
+    }
+
+    function extractSlideMetrics(doc, win, htmlContent) {
+      let metrics = {
+        domain: 'Grammar',
+        skill: '',
+        maxScore: 0
+      };
+
+      try {
+        if (win && win.ACTIVITY_METRICS && typeof win.ACTIVITY_METRICS === 'object') {
+          if (win.ACTIVITY_METRICS.domain) metrics.domain = win.ACTIVITY_METRICS.domain;
+          if (win.ACTIVITY_METRICS.skill) metrics.skill = win.ACTIVITY_METRICS.skill;
+          if (win.ACTIVITY_METRICS.maxScore !== undefined) metrics.maxScore = win.ACTIVITY_METRICS.maxScore;
+          return normalizeMetrics(metrics);
+        }
+      } catch (e) {}
+
+      const contentToSearch = htmlContent || (doc && doc.documentElement ? doc.documentElement.outerHTML : '');
+      if (contentToSearch) {
+        const match = contentToSearch.match(/(?:window\.)?ACTIVITY_METRICS\s*=\s*(\{[\s\S]*?\});/);
+        if (match) {
+          try {
+            const fn = new Function('return ' + match[1] + ';');
+            const res = fn();
+            if (res && typeof res === 'object') {
+              if (res.domain) metrics.domain = res.domain;
+              if (res.skill) metrics.skill = res.skill;
+              if (res.maxScore !== undefined) metrics.maxScore = res.maxScore;
+            }
+          } catch (err) {}
+        }
+      }
+
+      return normalizeMetrics(metrics);
+    }
 
     function escapeHtml(str) {
       if (!str) return '';
@@ -751,6 +833,7 @@
       }
 
       currentQaItems = items;
+      currentSlideMetrics = extractSlideMetrics(iframeDoc, iframe.contentWindow, slides[currentSlideIndex]?.html);
       renderQaInspectorModal();
       document.getElementById('qaInspectorModal').classList.remove('hidden');
     }
@@ -963,6 +1046,12 @@
     function renderQaInspectorModal() {
       const listEl = document.getElementById('qaInspectorList');
       const countEl = document.getElementById('qaInspectorCount');
+      const domainSelect = document.getElementById('qaDomainSelect');
+      const skillInput = document.getElementById('qaSkillInput');
+
+      if (domainSelect) domainSelect.value = currentSlideMetrics.domain || 'Grammar';
+      if (skillInput) skillInput.value = currentSlideMetrics.skill || '';
+
       if (!listEl) return;
 
       countEl.textContent = `${currentQaItems.length} ${currentQaItems.length === 1 ? 'pregunta detectada' : 'preguntas detectadas'}`;
@@ -1160,6 +1249,46 @@
           return m;
         });
       }
+
+      // 3. Actualizar contrato de métricas pedagógicas (Domain, Microcompetencia/Skill y maxScore)
+      const domainSelect = document.getElementById('qaDomainSelect');
+      const skillInput = document.getElementById('qaSkillInput');
+      const selectedDomain = domainSelect ? domainSelect.value : (currentSlideMetrics.domain || 'Grammar');
+      const enteredSkill = skillInput ? skillInput.value.trim() : (currentSlideMetrics.skill || '');
+      const calculatedMaxScore = currentQaItems.length || 0;
+
+      currentSlideMetrics = {
+        domain: selectedDomain,
+        skill: enteredSkill,
+        maxScore: calculatedMaxScore
+      };
+
+      const cleanDomain = selectedDomain.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      const cleanSkill = enteredSkill.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+      const metricsDeclaration = `window.ACTIVITY_METRICS = {\n      domain: '${cleanDomain}',\n      skill: '${cleanSkill}',\n      maxScore: ${calculatedMaxScore}\n    };`;
+
+      const metricsRegex = /(?:window\.)?ACTIVITY_METRICS\s*=\s*\{[\s\S]*?\};/;
+      if (metricsRegex.test(updatedHtml)) {
+        updatedHtml = updatedHtml.replace(metricsRegex, metricsDeclaration);
+      } else {
+        const scriptTagMatch = updatedHtml.match(/<script(?![^>]*src=)[^>]*>/i);
+        if (scriptTagMatch) {
+          const insertIdx = scriptTagMatch.index + scriptTagMatch[0].length;
+          updatedHtml = updatedHtml.slice(0, insertIdx) + '\n    ' + metricsDeclaration + '\n' + updatedHtml.slice(insertIdx);
+        } else if (/<body/i.test(updatedHtml)) {
+          updatedHtml = updatedHtml.replace(/<\/body>/i, `  <script>\n    ${metricsDeclaration}\n  <\/script>\n</body>`);
+        }
+      }
+
+      try {
+        if (iframe.contentWindow) {
+          iframe.contentWindow.ACTIVITY_METRICS = {
+            domain: selectedDomain,
+            skill: enteredSkill,
+            maxScore: calculatedMaxScore
+          };
+        }
+      } catch (e) {}
 
       slides[currentSlideIndex].html = updatedHtml;
       saveHistorySnapshot();
@@ -2137,8 +2266,25 @@ REGLAS DE RESPONSIVIDAD Y EXPERIENCIA MÓVIL (ESTRICTO):
 4. Ergonomía Táctil:
    - Todo elemento interactivo (botones T/F/DS, selectores, fichas de palabras) debe tener un área táctil mínima de 42px de alto (mínimo py-2 px-3) con espacios suficientes (gap-2) para evitar toques accidentales.
    - Tipografía legible sin zoom: mínimo 14px (text-sm) para textos y 15-16px para inputs/selects para evitar el auto-zoom de iOS.
-5. Lógica Pedagógica y Calificación:
+5. Lógica Pedagógica, Métricas y Calificación:
    - Si hay un Answer Key, úsalo como verdad absoluta sin revelar respuestas de antemano.
+   - CONTRATO OBLIGATORIO DE MÉTRICAS PEDAGÓGICAS (ANALÍTICA Y SESIONES EN VIVO):
+     Cada diapositiva DEBE declarar al inicio de su script:
+     window.ACTIVITY_METRICS = {
+       domain: 'Grammar' | 'Vocabulary' | 'Reading' | 'Listening',
+       skill: 'identificador_en_snake_case' (ej: 'present_simple', 'weekend_activities', 'reading_for_detail'),
+       maxScore: N (número total de ítems calificables)
+     };
+    
+     En la función de calificación (Check Answers), además de actualizar las clases visuales y el marcador en pantalla, DEBE despachar el evento global de desacoplamiento:
+     window.dispatchEvent(new CustomEvent('ELT_ACTIVITY_UPDATE', {
+       detail: {
+         metrics: window.ACTIVITY_METRICS,
+         score: correctCount,
+         total: inputs.length,
+         completed: correctCount === inputs.length
+       }
+     }));
    - Botón "Check Answers" que coloree aciertos en verde (#059669) y errores en rojo (#dc2626).
    - Botón "Reset" funcional.
    - Contador Score: X / Y y emisión de evento: window.parent.postMessage({ type: 'ACTIVITY_SCORE', score: correctCount, total: totalCount }, '*');
