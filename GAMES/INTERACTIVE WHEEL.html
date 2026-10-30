@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ruleta de Adjetivo + Preposición (Nivel B1)</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- SheetJS para lectura de Excel (.xlsx, .xls) y CSV -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <!-- Confetti para celebración de aciertos -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,500;0,700;0,800;0,900;1,700&display=swap');
+
+    * {
+      box-sizing: border-box;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    input, textarea, table, code, pre {
+      user-select: text !important;
+      -webkit-user-select: text !important;
+    }
+
+    body {
+      font-family: 'Montserrat', sans-serif;
+      background-color: #0b0d12;
+      overflow-x: hidden;
+    }
+
+    /* Fondo facetado / poligonal oscuro idéntico a Wordwall */
+    .wordwall-polygonal-bg {
+      background-color: #0b0d12;
+      background-image: 
+        radial-gradient(circle at 50% 50%, rgba(33, 38, 49, 0.9) 0%, rgba(6, 7, 10, 0.98) 100%),
+        linear-gradient(135deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+        linear-gradient(225deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+        linear-gradient(315deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+        linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%);
+      background-size: 100% 100%, 80px 80px, 80px 80px, 80px 80px, 80px 80px;
+      background-position: 0 0, 0 0, 40px 0, 40px -40px, 0px 40px;
+    }
+
+    .glass-panel {
+      background: rgba(14, 17, 24, 0.95);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+    }
+
+    /* Barra de scroll estilizada */
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.25);
+      border-radius: 4px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.45);
+    }
+
+    .wordwall-glow-btn:hover {
+      box-shadow: 0 0 25px rgba(255, 255, 255, 0.45);
+    }
+  </style>
+</head>
+<body class="wordwall-polygonal-bg text-white min-h-screen flex flex-col justify-between selection:bg-indigo-600 selection:text-white">
+
+  <!-- BARRA SUPERIOR -->
+  <header class="w-full px-4 py-3 flex items-center justify-between z-20 border-b border-white/10 bg-black/40 text-xs sm:text-sm">
+    <div class="flex items-center gap-3">
+      <!-- Cronómetro de sesión -->
+      <div id="sessionTimer" class="font-mono text-gray-300 font-bold tracking-wider text-sm sm:text-base bg-white/5 border border-white/10 px-2.5 py-1 rounded-lg">
+        0:00
+      </div>
+      <!-- Contador de ítems activos -->
+      <div class="px-3 py-1 rounded-lg bg-white/10 border border-white/15 text-gray-200 text-xs flex items-center gap-1.5">
+        <span>Ítems restantes:</span>
+        <span id="activeCountBadge" class="font-black text-white text-sm">20</span>
+        <span class="text-gray-400">/</span>
+        <span id="totalCountBadge" class="text-gray-300 text-xs">20</span>
+      </div>
+    </div>
+
+    <!-- Título de nivel central -->
+    <div class="hidden md:flex items-center gap-2 bg-black/60 border border-white/15 px-3 py-1 rounded-full text-xs text-gray-300">
+      <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+      <span class="text-white font-bold">Adjective + Preposition</span> · <span class="text-indigo-400 font-semibold">Nivel B1 (Adult Speaking)</span>
+    </div>
+
+    <!-- Botones de configuración rápida -->
+    <div class="flex items-center gap-2">
+      <!-- Abrir Modal de Importar / Editar -->
+      <button id="btnOpenImportModal" class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs sm:text-sm transition-all shadow-md shadow-indigo-950/40 active:scale-95">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+        </svg>
+        <span>Importar / Editar</span>
+      </button>
+
+      <!-- Toggle de Sonido -->
+      <button id="btnSoundToggle" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white" title="Activar/Silenciar sonido">
+        <svg id="iconSoundOn" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M11 5L6 9H2v6h4l5 4V5z"/>
+        </svg>
+        <svg id="iconSoundOff" class="w-4 h-4 sm:w-5 sm:h-5 hidden text-gray-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2"/>
+        </svg>
+      </button>
+
+      <!-- Pantalla completa -->
+      <button id="btnFullscreenToggle" class="p-2 rounded-xl bg-white/10 hover:bg-white/20 transition-colors text-white" title="Pantalla completa">
+        <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- TOAST / AVISOS FLOTANTES -->
+  <div id="toastNotification" class="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-indigo-600 border border-indigo-300 text-white px-5 py-2.5 rounded-xl shadow-2xl text-xs sm:text-sm font-semibold opacity-0 transition-opacity duration-300 pointer-events-none flex items-center gap-2">
+    <span id="toastIcon">✨</span>
+    <span id="toastMessage">Operación realizada con éxito</span>
+  </div>
+
+  <!-- ÁREA PRINCIPAL: RULETA WORDWALL -->
+  <main class="relative flex-1 flex flex-col items-center justify-center p-3 sm:p-5 overflow-hidden">
+    <div class="relative flex items-center justify-center max-w-[94vw] max-h-[72vh] aspect-square">
+      
+      <!-- FLECHA INDICADORA LATERAL IZQUIERDA (A las 9 en punto / 180° hacia el centro) -->
+      <div id="pointerIndicator" class="absolute -left-3 sm:-left-7 top-1/2 -translate-y-1/2 z-20 pointer-events-none drop-shadow-[0_4px_18px_rgba(0,0,0,0.95)]">
+        <svg class="w-11 h-11 sm:w-16 sm:h-16" viewBox="0 0 100 100" fill="none">
+          <path d="M 10 34 L 56 34 L 56 16 L 90 50 L 56 84 L 56 66 L 10 66 Z" 
+                fill="#12141a" stroke="#ffffff" stroke-width="7" stroke-linejoin="round" stroke-linecap="round"/>
+          <path d="M 14 38 L 52 38 L 52 24 L 84 50 L 52 76 L 52 62 L 14 62 Z" 
+                fill="#1f2533" stroke="#818cf8" stroke-width="2.5"/>
+        </svg>
+      </div>
+
+      <!-- Canvas de la Ruleta -->
+      <canvas id="wheelCanvas" class="cursor-pointer transition-transform duration-100 ease-out drop-shadow-[0_15px_45px_rgba(0,0,0,0.95)]"></canvas>
+
+    </div>
+  </main>
+
+  <!-- BARRA INFERIOR DE ACCIONES -->
+  <footer class="w-full py-4 px-6 flex flex-wrap items-center justify-center gap-3.5 z-10 border-t border-white/10 bg-black/60">
+    <button id="btnSpinWheel" class="wordwall-glow-btn px-10 py-3.5 rounded-full border-2 border-white bg-black/85 hover:bg-white hover:text-black font-black text-lg sm:text-xl tracking-wider transition-all duration-200 shadow-2xl active:scale-95 flex items-center gap-2.5">
+      <svg class="w-5 h-5 inline text-indigo-400 group-hover:text-black" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+      </svg>
+      <span>GIRAR</span>
+    </button>
+
+    <button id="btnResetActiveRound" class="px-5 py-3 rounded-full border border-white/25 bg-white/5 hover:bg-white/15 text-gray-200 hover:text-white font-semibold text-xs sm:text-sm transition-all duration-200">
+      Reiniciar Ronda (Restaurar Todos)
+    </button>
+  </footer>
+
+  <!-- MODAL DE RESULTADO / PREGUNTA DE PRESIÓN -->
+  <div id="resultModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="glass-panel border-2 border-white/35 rounded-2xl max-w-xl w-full p-6 sm:p-8 text-center shadow-2xl transform scale-90 transition-transform duration-300 text-white relative">
+      
+      <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-widest bg-indigo-500/20 text-indigo-300 border border-indigo-400/30 mb-3">
+        <span>Resultado</span>
+      </div>
+
+      <h2 id="modalComboTitle" class="text-3xl sm:text-4xl font-black tracking-tight text-white mb-4 uppercase drop-shadow-md">
+        GOOD AT
+      </h2>
+
+      <div class="bg-white/5 border border-white/10 rounded-xl p-5 mb-5 text-left">
+        <p class="text-[11px] uppercase tracking-wider text-gray-400 mb-1.5 font-bold">Pregunta para responder:</p>
+        <p id="modalQuestionText" class="text-base sm:text-xl font-semibold text-gray-100 leading-relaxed">
+          What is a skill or task you are really good at doing in your daily job?
+        </p>
+      </div>
+
+      <!-- Tip pedagógico de gramática -->
+      <div class="bg-emerald-950/40 border border-emerald-500/35 rounded-xl p-3.5 mb-6 text-left flex items-start gap-3">
+        <span class="text-emerald-400 text-xl font-bold leading-none mt-0.5">💡</span>
+        <div class="text-xs sm:text-sm text-emerald-200">
+          <strong class="font-bold text-white">Recordatorio gramatical:</strong> Responde usando un <span class="underline decoration-emerald-400 font-bold text-white">sustantivo</span> o un <span class="underline decoration-emerald-400 font-bold text-white">verbo en gerundio (-ing)</span>.
+        </div>
+      </div>
+
+      <!-- Botones Reanudar / Eliminar estilo Wordwall -->
+      <div class="flex flex-col sm:flex-row items-center justify-center gap-3">
+        <button id="btnKeepItem" class="w-full sm:w-auto flex-1 py-3 px-6 rounded-xl border border-white/30 bg-white/10 hover:bg-white/20 text-white font-bold text-base transition-all active:scale-95">
+          Reanudar (Dejar en ruleta)
+        </button>
+        <button id="btnEliminateItem" class="w-full sm:w-auto flex-1 py-3 px-6 rounded-xl border-2 border-red-500 bg-red-600/80 hover:bg-red-600 text-white font-bold text-base transition-all active:scale-95 shadow-lg shadow-red-950/40">
+          Eliminar (Quitar ítem)
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL DE FINALIZACIÓN -->
+  <div id="finishModal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="glass-panel border-2 border-white/25 rounded-2xl max-w-md w-full p-8 text-center shadow-2xl">
+      <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-emerald-500/20 border border-emerald-400 flex items-center justify-center text-3xl">
+        🎉
+      </div>
+      <h2 class="text-2xl font-black text-white mb-2">¡Ronda Completada!</h2>
+      <p class="text-gray-300 text-sm mb-6">
+        Has repasado todas las combinaciones de esta sesión con éxito.
+      </p>
+      <button id="btnRestartAfterFinish" class="w-full py-3.5 px-6 rounded-xl border-2 border-white bg-white text-black font-black text-base hover:bg-gray-200 transition-all">
+        Reiniciar Todos los Ítems
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL PRINCIPAL: IMPORTADOR & EDITOR -->
+  <div id="importModal" class="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 opacity-0 pointer-events-none transition-opacity duration-300">
+    <div class="glass-panel border-2 border-white/20 rounded-2xl max-w-4xl w-full h-[92vh] flex flex-col shadow-2xl overflow-hidden">
+      
+      <!-- Encabezado modal -->
+      <div class="px-6 py-4 border-b border-white/10 flex items-center justify-between bg-white/5">
+        <div class="flex items-center gap-3">
+          <div class="p-2 rounded-xl bg-indigo-600/30 border border-indigo-500/40 text-indigo-400">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+          </div>
+          <div>
+            <h3 class="text-base sm:text-lg font-bold text-white">Gestionar Preguntas de la Ruleta</h3>
+            <p class="text-xs text-gray-400">Carga archivos Excel/CSV, copia tablas o edita preguntas directamente</p>
+          </div>
+        </div>
+
+        <button id="btnCloseImportModal" class="p-1.5 rounded-lg text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Barra rápida de 1 clic: Restaurar B1 -->
+      <div class="px-6 py-2.5 bg-indigo-950/40 border-b border-indigo-500/25 flex items-center justify-between flex-wrap gap-2">
+        <div class="text-xs text-indigo-200">
+          ¿Quieres cargar rápidamente las preguntas B1 de Adjetivos + Preposiciones?
+        </div>
+        <button id="btnQuickLoadB1Preset" class="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs transition-all shadow-sm active:scale-95 flex items-center gap-1.5">
+          <span>⚡ Cargar 20 Preguntas B1 por Defecto</span>
+        </button>
+      </div>
+
+      <!-- Pestañas de navegación -->
+      <div class="flex border-b border-white/10 bg-black/40 px-6 pt-2 gap-2 text-xs sm:text-sm font-semibold">
+        <button id="tabBtnUpload" class="px-4 py-2.5 border-b-2 border-indigo-500 text-white transition-colors flex items-center gap-1.5">
+          <span>📁 Subir Excel / CSV</span>
+        </button>
+        <button id="tabBtnPaste" class="px-4 py-2.5 border-b-2 border-transparent text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+          <span>📋 Pegar Tabla o Lista</span>
+        </button>
+        <button id="tabBtnManual" class="px-4 py-2.5 border-b-2 border-transparent text-gray-400 hover:text-white transition-colors flex items-center gap-1.5">
+          <span>✏️ Editor Manual (<span id="manualCountBadge">20</span>)</span>
+        </button>
+      </div>
+
+      <!-- Contenidos de las pestañas -->
+      <div class="flex-1 overflow-hidden p-4 sm:p-6 bg-black/20">
+        
+        <!-- PESTAÑA 1: SUBIR ARCHIVO EXCEL / CSV -->
+        <div id="tabContentUpload" class="h-full flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+              <p class="text-xs text-gray-300">
+                Sube tu hoja de cálculo (.xlsx, .xls) o archivo (.csv). 
+                <span class="text-gray-400">Columna A = Texto en segmento, Columna B = Pregunta completa.</span>
+              </p>
+              <button id="btnDownloadSampleCSV" class="text-xs text-indigo-400 hover:text-indigo-300 underline font-medium">
+                Descargar plantilla CSV de ejemplo
+              </button>
+            </div>
+
+            <!-- Zona Drag and Drop -->
+            <div id="dropZoneContainer" class="border-2 border-dashed border-white/20 hover:border-indigo-400/80 rounded-2xl p-7 text-center cursor-pointer transition-all bg-white/[0.02] hover:bg-indigo-950/20">
+              <input type="file" id="fileSelectorInput" accept=".xlsx, .xls, .csv, text/csv" class="hidden">
+              <div class="w-14 h-14 mx-auto mb-3 rounded-full bg-indigo-600/20 border border-indigo-500/40 flex items-center justify-center text-indigo-300 text-2xl">
+                📥
+              </div>
+              <p class="text-sm font-bold text-white mb-1">Arrastra tu archivo Excel o CSV aquí</p>
+              <p class="text-xs text-gray-400 mb-4">o haz clic para buscar en tu dispositivo</p>
+              <span class="px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-lg text-xs font-semibold transition-all">
+                Seleccionar archivo
+              </span>
+            </div>
+          </div>
+
+          <!-- Vista previa de archivo cargado -->
+          <div id="uploadPreviewSection" class="hidden mt-4 flex-1 flex flex-col min-h-0 bg-white/5 border border-white/10 rounded-xl p-3">
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-xs font-bold text-emerald-400">
+              <span id="uploadFileNameLabel">Archivo cargado</span>
+              <span id="uploadCountBadge" class="text-white font-mono bg-emerald-500/20 px-2 py-0.5 rounded">0 ítems detectados</span>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar pr-1">
+              <table class="w-full text-left text-xs text-gray-300 border-collapse">
+                <thead>
+                  <tr class="border-b border-white/10 text-gray-400 uppercase text-[10px]">
+                    <th class="py-1 px-2 w-10">#</th>
+                    <th class="py-1 px-2 w-1/3">Segmento</th>
+                    <th class="py-1 px-2">Pregunta / Consigna</th>
+                  </tr>
+                </thead>
+                <tbody id="uploadPreviewTableBody"></tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Acciones de confirmación de archivo -->
+          <div id="uploadActionButtons" class="hidden pt-4 border-t border-white/10 flex items-center justify-end gap-3">
+            <button id="btnUploadAppend" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all">
+              Añadir a los existentes
+            </button>
+            <button id="btnUploadReplace" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-indigo-950/40">
+              Reemplazar ruleta con este archivo
+            </button>
+          </div>
+        </div>
+
+        <!-- PESTAÑA 2: PEGAR DESDE TABLA O TEXTO -->
+        <div id="tabContentPaste" class="h-full hidden flex flex-col">
+          <div class="mb-2">
+            <h4 class="text-xs sm:text-sm font-bold text-white mb-1">Pega celdas copiadas de Excel, Google Sheets o texto</h4>
+            <p class="text-[11px] text-gray-400 leading-relaxed">
+              Copia directamente cualquier rango en Excel con <kbd class="px-1.5 py-0.5 bg-white/10 rounded text-gray-300 font-mono">Ctrl+C</kbd> y pégalo abajo. También detecta formatos con plecas (<code class="text-indigo-300">good at | What are you good at?</code>) o dos puntos.
+            </p>
+          </div>
+
+          <textarea id="pasteTextInputArea" class="h-32 sm:h-36 w-full bg-black/60 border border-white/20 rounded-xl p-3 text-xs sm:text-sm font-mono text-gray-200 focus:outline-none focus:border-indigo-400 custom-scrollbar resize-none mb-3" placeholder="good at	What is a skill or task you are really good at doing in your daily job?
+bad at	What is one subject or practical task you are bad at?
+interested in	What new topic or skill are you most interested in learning this year?"></textarea>
+
+          <!-- Previsualización en tiempo real -->
+          <div class="flex-1 flex flex-col min-h-0 bg-white/5 border border-white/10 rounded-xl p-3 mb-3">
+            <div class="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-xs">
+              <span class="text-gray-300 font-semibold">Vista previa en tiempo real:</span>
+              <span id="pasteDetectedBadge" class="text-xs font-mono font-bold text-indigo-300 bg-indigo-500/20 px-2 py-0.5 rounded border border-indigo-400/30">0 ítems detectados</span>
+            </div>
+            <div class="flex-1 overflow-y-auto custom-scrollbar pr-1">
+              <table class="w-full text-left text-xs text-gray-300 border-collapse">
+                <thead>
+                  <tr class="border-b border-white/10 text-gray-400 uppercase text-[10px]">
+                    <th class="py-1 px-2 w-10">#</th>
+                    <th class="py-1 px-2 w-1/3">Segmento</th>
+                    <th class="py-1 px-2">Pregunta</th>
+                  </tr>
+                </thead>
+                <tbody id="pastePreviewTableBody">
+                  <tr>
+                    <td colspan="3" class="py-6 text-center text-gray-500 italic">Pega contenido arriba para ver la vista previa aquí...</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="flex items-center justify-end gap-3 pt-2 border-t border-white/10">
+            <button id="btnPasteAppend" class="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all">
+              Añadir a los existentes
+            </button>
+            <button id="btnPasteReplace" class="px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-indigo-950/40">
+              Reemplazar ruleta con este texto
+            </button>
+          </div>
+        </div>
+
+        <!-- PESTAÑA 3: EDITOR MANUAL -->
+        <div id="tabContentManual" class="h-full hidden flex flex-col">
+          <div class="flex items-center justify-between pb-2 mb-2">
+            <span class="text-xs text-gray-400">Edita directamente cada etiqueta o pregunta:</span>
+            <button id="btnAddNewSlice" class="flex items-center gap-1 text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg transition-colors">
+              <span>+ Añadir Nuevo Ítem</span>
+            </button>
+          </div>
+
+          <div id="manualItemsContainer" class="flex-1 overflow-y-auto custom-scrollbar space-y-2 pr-2">
+            <!-- Filas dinámicas -->
+          </div>
+
+          <div class="pt-3 border-t border-white/10 flex items-center justify-end gap-3">
+            <button id="btnSaveManualList" class="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white text-xs sm:text-sm font-bold transition-all shadow-md shadow-emerald-950/40">
+              Guardar Cambios en la Ruleta
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Pie de modal -->
+      <div class="px-6 py-3.5 border-t border-white/10 bg-black/60 flex items-center justify-between flex-wrap gap-2">
+        <button id="btnResetToDefaultsFooter" class="text-xs text-gray-400 hover:text-white underline underline-offset-4 transition-colors">
+          Restaurar configuración original
+        </button>
+        <button id="btnDismissModalFooter" class="px-4 py-1.5 rounded-lg border border-white/20 hover:bg-white/10 text-gray-300 text-xs font-bold transition-all">
+          Cerrar
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    /**
+     * BANCO DE 20 PREGUNTAS B1 (ADJECTIVE + PREPOSITION)
+     */
+    const B1_QUESTIONS_DATASET = [
+      { combo: "good at", question: "What is a skill or task you are really good at doing in your daily job?" },
+      { combo: "bad at", question: "What is one subject or practical task you are bad at?" },
+      { combo: "interested in", question: "What new topic or skill are you most interested in learning this year?" },
+      { combo: "keen on", question: "Are you keen on working in a team, or do you prefer working alone?" },
+      { combo: "bored with", question: "What routine tasks at work do you get bored with very quickly?" },
+      { combo: "fed up with", question: "What is something about office life or daily traffic that you are fed up with?" },
+      { combo: "satisfied with", question: "Are you satisfied with your current job and career progress?" },
+      { combo: "pleased with", question: "What recent project or personal goal were you pleased with?" },
+      { combo: "surprised by", question: "What local habit or tradition were you surprised by when traveling abroad?" },
+      { combo: "scared of", question: "What adventure activity or extreme sport are you scared of trying?" },
+      { combo: "frightened of", question: "Have you ever been frightened of missing a flight or getting lost in a new city?" },
+      { combo: "embarrassed by", question: "Have you ever felt embarrassed by making a mistake speaking English?" },
+      { combo: "happy with", question: "Are you happy with your work-life balance at the moment?" },
+      { combo: "nervous about", question: "Do you still get nervous about speaking in public or giving a presentation?" },
+      { combo: "worried about", question: "What is something about your future or career that you are worried about?" },
+      { combo: "concerned about", question: "What environmental or social problem are you most concerned about?" },
+      { combo: "annoyed at", question: "What habits do you get annoyed at when working with other people?" },
+      { combo: "upset about", question: "What kind of unfair situations at work do you usually get upset about?" },
+      { combo: "angry about", question: "What travel problem makes you really angry about airline customer service?" },
+      { combo: "angry with", question: "Have you ever been angry with a coworker or boss? What happened?" }
+    ];
+
+    const STORAGE_KEY = 'wordwall_b1_wheel_data_v1';
+
+    // Estado de la ruleta
+    let masterItems = [];
+    let activeWheelItems = [];
+    let currentAngle = 0;
+    let isSpinning = false;
+    let selectedWedgeIndex = -1;
+    let isSoundMuted = false;
+    let lastCrossedIndex = -1;
+
+    // Buffers de importación
+    let fileParsedItems = [];
+    let pasteParsedItems = [];
+
+    // Referencias DOM principales
+    const canvas = document.getElementById('wheelCanvas');
+    const ctx = canvas.getContext('2d');
+    const btnSpinWheel = document.getElementById('btnSpinWheel');
+    const btnResetActiveRound = document.getElementById('btnResetActiveRound');
+    const activeCountBadge = document.getElementById('activeCountBadge');
+    const totalCountBadge = document.getElementById('totalCountBadge');
+    const manualCountBadge = document.getElementById('manualCountBadge');
+    const sessionTimer = document.getElementById('sessionTimer');
+    const btnSoundToggle = document.getElementById('btnSoundToggle');
+    const iconSoundOn = document.getElementById('iconSoundOn');
+    const iconSoundOff = document.getElementById('iconSoundOff');
+    const btnFullscreenToggle = document.getElementById('btnFullscreenToggle');
+
+    // Notificaciones
+    const toastNotification = document.getElementById('toastNotification');
+    const toastMessage = document.getElementById('toastMessage');
+    const toastIcon = document.getElementById('toastIcon');
+
+    // Modales
+    const resultModal = document.getElementById('resultModal');
+    const modalComboTitle = document.getElementById('modalComboTitle');
+    const modalQuestionText = document.getElementById('modalQuestionText');
+    const btnKeepItem = document.getElementById('btnKeepItem');
+    const btnEliminateItem = document.getElementById('btnEliminateItem');
+
+    const finishModal = document.getElementById('finishModal');
+    const btnRestartAfterFinish = document.getElementById('btnRestartAfterFinish');
+
+    const importModal = document.getElementById('importModal');
+    const btnOpenImportModal = document.getElementById('btnOpenImportModal');
+    const btnCloseImportModal = document.getElementById('btnCloseImportModal');
+    const btnDismissModalFooter = document.getElementById('btnDismissModalFooter');
+    const btnQuickLoadB1Preset = document.getElementById('btnQuickLoadB1Preset');
+    const btnResetToDefaultsFooter = document.getElementById('btnResetToDefaultsFooter');
+
+    // Pestañas
+    const tabBtnUpload = document.getElementById('tabBtnUpload');
+    const tabBtnPaste = document.getElementById('tabBtnPaste');
+    const tabBtnManual = document.getElementById('tabBtnManual');
+    const tabContentUpload = document.getElementById('tabContentUpload');
+    const tabContentPaste = document.getElementById('tabContentPaste');
+    const tabContentManual = document.getElementById('tabContentManual');
+
+    // Elementos Pestaña Upload
+    const dropZoneContainer = document.getElementById('dropZoneContainer');
+    const fileSelectorInput = document.getElementById('fileSelectorInput');
+    const uploadPreviewSection = document.getElementById('uploadPreviewSection');
+    const uploadFileNameLabel = document.getElementById('uploadFileNameLabel');
+    const uploadCountBadge = document.getElementById('uploadCountBadge');
+    const uploadPreviewTableBody = document.getElementById('uploadPreviewTableBody');
+    const uploadActionButtons = document.getElementById('uploadActionButtons');
+    const btnUploadAppend = document.getElementById('btnUploadAppend');
+    const btnUploadReplace = document.getElementById('btnUploadReplace');
+    const btnDownloadSampleCSV = document.getElementById('btnDownloadSampleCSV');
+
+    // Elementos Pestaña Paste
+    const pasteTextInputArea = document.getElementById('pasteTextInputArea');
+    const pasteDetectedBadge = document.getElementById('pasteDetectedBadge');
+    const pastePreviewTableBody = document.getElementById('pastePreviewTableBody');
+    const btnPasteAppend = document.getElementById('btnPasteAppend');
+    const btnPasteReplace = document.getElementById('btnPasteReplace');
+
+    // Elementos Pestaña Manual
+    const manualItemsContainer = document.getElementById('manualItemsContainer');
+    const btnAddNewSlice = document.getElementById('btnAddNewSlice');
+    const btnSaveManualList = document.getElementById('btnSaveManualList');
+
+    /**
+     * ALMACENAMIENTO PERSISTENTE
+     */
+    function loadSavedItems() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed) && parsed.length >= 2) {
+            masterItems = parsed;
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("Error al leer almacenamiento local:", err);
+      }
+      masterItems = JSON.parse(JSON.stringify(B1_QUESTIONS_DATASET));
+    }
+
+    function saveItemsLocally() {
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(masterItems));
+      } catch (err) {
+        console.error("Error al escribir en almacenamiento local:", err);
+      }
+    }
+
+    function showNotification(msg, icon = "✨") {
+      toastMessage.textContent = msg;
+      toastIcon.textContent = icon;
+      toastNotification.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toastNotification.classList.add('opacity-0', 'pointer-events-none');
+      }, 2600);
+    }
+
+    /**
+     * EFECTOS DE SONIDO (WEB AUDIO API SINTETIZADO)
+     */
+    let audioCtx = null;
+    function initAudio() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playTickClick() {
+      if (isSoundMuted) return;
+      try {
+        initAudio();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(650, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(120, audioCtx.currentTime + 0.03);
+
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.03);
+
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.03);
+      } catch (e) {}
+    }
+
+    function playSuccessChime() {
+      if (isSoundMuted) return;
+      try {
+        initAudio();
+        const chords = [523.25, 659.25, 783.99, 1046.50]; // Acorde C Mayor
+        chords.forEach((f, idx) => {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          const start = audioCtx.currentTime + idx * 0.07;
+
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f, start);
+
+          gain.gain.setValueAtTime(0.2, start);
+          gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.35);
+
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(start);
+          osc.stop(start + 0.35);
+        });
+      } catch (e) {}
+    }
+
+    function fireCelebrationConfetti() {
+      if (typeof confetti === 'function') {
+        confetti({
+          particleCount: 65,
+          spread: 60,
+          origin: { y: 0.6 },
+          colors: ['#6366f1', '#10b981', '#3b82f6', '#f59e0b', '#ffffff']
+        });
+      }
+    }
+
+    /**
+     * RENDERIZADO DEL CANVAS (ESTILO WORDWALL)
+     */
+    function updateHeaderStats() {
+      activeCountBadge.textContent = activeWheelItems.length;
+      totalCountBadge.textContent = masterItems.length;
+      manualCountBadge.textContent = masterItems.length;
+    }
+
+    function adjustCanvasDPI() {
+      const parent = canvas.parentElement;
+      const size = Math.min(parent.clientWidth, parent.clientHeight, 640);
+      const dpr = window.devicePixelRatio || 1;
+
+      canvas.width = size * dpr;
+      canvas.height = size * dpr;
+      canvas.style.width = `${size}px`;
+      canvas.style.height = `${size}px`;
+
+      ctx.resetTransform?.();
+      ctx.scale(dpr, dpr);
+      renderWheel();
+    }
+
+    function renderWheel() {
+      const size = parseFloat(canvas.style.width) || 400;
+      const center = size / 2;
+      const radius = center - 8;
+      const total = activeWheelItems.length;
+
+      ctx.clearRect(0, 0, size, size);
+
+      if (total === 0) {
+        ctx.save();
+        ctx.fillStyle = '#11131a';
+        ctx.beginPath();
+        ctx.arc(center, center, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 4;
+        ctx.stroke();
+
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '700 16px Montserrat, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('¡Ronda completada!', center, center);
+        ctx.restore();
+        return;
+      }
+
+      const arc = (Math.PI * 2) / total;
+      // Gama de colores Wordwall oscuro alternados
+      const sliceTones = [
+        '#0f1116', '#1a1f29', '#242a38', '#141720',
+        '#1d232f', '#12141a', '#283142', '#161922'
+      ];
+
+      for (let i = 0; i < total; i++) {
+        const angle = currentAngle + i * arc;
+
+        ctx.save();
+        ctx.beginPath();
+        ctx.moveTo(center, center);
+        ctx.arc(center, center, radius, angle, angle + arc);
+        ctx.closePath();
+
+        ctx.fillStyle = sliceTones[i % sliceTones.length];
+        ctx.fill();
+
+        // Borde blanco nítido estilo Wordwall
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = total > 18 ? 2 : 2.6;
+        ctx.stroke();
+
+        // Texto orientado radialmente
+        ctx.save();
+        ctx.translate(center, center);
+        ctx.rotate(angle + arc / 2);
+
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = '#ffffff';
+
+        // Escalar tamaño de fuente dinámicamente según la cantidad de sectores
+        const fontSize = total > 24 ? 10 : total > 16 ? 12 : total > 9 ? 14 : 17;
+        ctx.font = `800 ${fontSize}px Montserrat, sans-serif`;
+
+        let label = activeWheelItems[i].combo || "Ítem";
+        if (label.length > 25) label = label.substring(0, 23) + '...';
+
+        ctx.shadowColor = 'rgba(0,0,0,0.9)';
+        ctx.shadowBlur = 5;
+        ctx.fillText(label, radius - 18, 0);
+
+        ctx.restore();
+        ctx.restore();
+      }
+
+      // Anillo perimetral exterior blanco
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(center, center, radius, 0, Math.PI * 2);
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+      ctx.restore();
+
+      // Centro Circular Wordwall ("GIRAR" / "B1 Speaking")
+      const hubRadius = radius * 0.28;
+      ctx.save();
+      ctx.beginPath();
+      ctx.arc(center, center, hubRadius, 0, Math.PI * 2);
+      ctx.fillStyle = '#111319';
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 4;
+      ctx.stroke();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.font = `900 ${hubRadius * 0.32}px Montserrat, sans-serif`;
+      ctx.fillText('GIRAR', center, center);
+      ctx.restore();
+    }
+
+    /**
+     * LOCALIZAR EL SEGMENTO APUNTADO POR LA FLECHA IZQUIERDA
+     * La flecha está en el lado izquierdo (180° / PI radianes).
+     */
+    function getPointerSegmentIndex(angle) {
+      if (activeWheelItems.length === 0) return -1;
+      const total = activeWheelItems.length;
+      const arc = (Math.PI * 2) / total;
+      const pointerRads = Math.PI; // 180 grados
+
+      let rel = (pointerRads - angle) % (Math.PI * 2);
+      if (rel < 0) rel += Math.PI * 2;
+
+      return Math.floor(rel / arc) % total;
+    }
+
+    /**
+     * MOTOR DE GIRO CON FÍSICA EASE-OUT
+     */
+    function spin() {
+      if (isSpinning || activeWheelItems.length === 0) return;
+      initAudio();
+      isSpinning = true;
+      btnSpinWheel.disabled = true;
+      btnSpinWheel.classList.add('opacity-50', 'cursor-not-allowed');
+
+      const spinDuration = 3900 + Math.random() * 1100;
+      const fullRotations = 6 + Math.floor(Math.random() * 4);
+      const totalDelta = fullRotations * Math.PI * 2 + Math.random() * Math.PI * 2;
+
+      const startAngle = currentAngle;
+      const startTimestamp = performance.now();
+      lastCrossedIndex = getPointerSegmentIndex(currentAngle);
+
+      function easeOutQuart(t) {
+        return 1 - Math.pow(1 - t, 4);
+      }
+
+      function frameLoop(time) {
+        const elapsed = time - startTimestamp;
+        const progress = Math.min(elapsed / spinDuration, 1);
+        const eased = easeOutQuart(progress);
+
+        currentAngle = startAngle + totalDelta * eased;
+
+        const currentSlice = getPointerSegmentIndex(currentAngle);
+        if (currentSlice !== lastCrossedIndex) {
+          playTickClick();
+          lastCrossedIndex = currentSlice;
+        }
+
+        renderWheel();
+
+        if (progress < 1) {
+          requestAnimationFrame(frameLoop);
+        } else {
+          currentAngle = currentAngle % (Math.PI * 2);
+          isSpinning = false;
+          btnSpinWheel.disabled = false;
+          btnSpinWheel.classList.remove('opacity-50', 'cursor-not-allowed');
+
+          selectedWedgeIndex = getPointerSegmentIndex(currentAngle);
+          playSuccessChime();
+          fireCelebrationConfetti();
+          openModalPrompt(selectedWedgeIndex);
+        }
+      }
+
+      requestAnimationFrame(frameLoop);
+    }
+
+    /**
+     * MODAL DE RESULTADO
+     */
+    function openModalPrompt(index) {
+      if (index < 0 || index >= activeWheelItems.length) return;
+      const item = activeWheelItems[index];
+
+      modalComboTitle.textContent = item.combo;
+      modalQuestionText.textContent = item.question || `¿Qué puedes responder sobre "${item.combo}"?`;
+
+      resultModal.classList.remove('pointer-events-none', 'opacity-0');
+      resultModal.children[0].classList.remove('scale-90');
+      resultModal.children[0].classList.add('scale-100');
+    }
+
+    function closeModalPrompt() {
+      resultModal.classList.add('opacity-0', 'pointer-events-none');
+      resultModal.children[0].classList.remove('scale-100');
+      resultModal.children[0].classList.add('scale-90');
+    }
+
+    btnKeepItem.addEventListener('click', closeModalPrompt);
+
+    btnEliminateItem.addEventListener('click', () => {
+      if (selectedWedgeIndex >= 0 && selectedWedgeIndex < activeWheelItems.length) {
+        activeWheelItems.splice(selectedWedgeIndex, 1);
+        updateHeaderStats();
+        closeModalPrompt();
+        renderWheel();
+
+        if (activeWheelItems.length === 0) {
+          finishModal.classList.remove('pointer-events-none', 'opacity-0');
+        }
+      }
+    });
+
+    btnRestartAfterFinish.addEventListener('click', () => {
+      finishModal.classList.add('opacity-0', 'pointer-events-none');
+      resetRound();
+    });
+
+    function resetRound() {
+      activeWheelItems = JSON.parse(JSON.stringify(masterItems));
+      updateHeaderStats();
+      currentAngle = 0;
+      renderWheel();
+      showNotification("Ronda reiniciada con todos los ítems activos");
+    }
+
+    btnResetActiveRound.addEventListener('click', resetRound);
+
+    /**
+     * PARSER INTELIGENTE DE DATOS (EXCEL, CSV, TABLAS, TEXTO PLANO)
+     */
+    function parseImportText(rawText) {
+      if (!rawText || !rawText.trim()) return [];
+
+      const lines = rawText.split(/\r?\n/).map(l => l.trim()).filter(l => l.length > 0);
+      const output = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+
+        // Ignorar separadores markdown |---|---|
+        if (/^\|?(\s*:?-+:?\s*\|)+\s*:?-+:?\s*\|?$/.test(line)) {
+          continue;
+        }
+
+        let label = '';
+        let question = '';
+
+        if (line.includes('\t')) {
+          // Copiado de celdas de Excel / Google Sheets
+          const cols = line.split('\t').map(c => c.trim());
+          label = cols[0];
+          question = cols.slice(1).join(' ').trim();
+        } else if (line.includes('|')) {
+          // Separador con barra vertical o tabla markdown
+          const clean = line.replace(/^\|/, '').replace(/\|$/, '');
+          const cols = clean.split('|').map(c => c.trim());
+          label = cols[0];
+          question = cols.slice(1).join(' ').trim();
+        } else if (line.includes(';') && !line.includes(':')) {
+          // CSV con punto y coma
+          const cols = line.split(';').map(c => c.trim());
+          label = cols[0];
+          question = cols.slice(1).join('; ').trim();
+        } else if (line.includes(':')) {
+          const idx = line.indexOf(':');
+          label = line.substring(0, idx).trim();
+          question = line.substring(idx + 1).trim();
+        } else {
+          label = line;
+          question = line;
+        }
+
+        // Limpieza de comillas CSV
+        label = label.replace(/^["']|["']$/g, '').trim();
+        question = question.replace(/^["']|["']$/g, '').trim();
+
+        // Omitir posibles encabezados
+        if (i === 0) {
+          const lLow = label.toLowerCase();
+          const qLow = question.toLowerCase();
+          const isHeader = ['etiqueta', 'label', 'item', 'segmento', 'adjective', 'ruleta', 'preposition'].some(h => lLow.includes(h)) ||
+                           ['pregunta', 'question', 'prompt', 'detalle'].some(h => qLow.includes(h));
+          if (isHeader) continue;
+        }
+
+        if (label.length > 0) {
+          output.push({
+            combo: label,
+            question: question.length > 0 ? question : label
+          });
+        }
+      }
+
+      return output;
+    }
+
+    /**
+     * GESTIÓN DE ARCHIVOS EXCEL (.XLSX) Y CSV
+     */
+    function displayUploadPreview(items, fileName) {
+      fileParsedItems = items;
+      uploadFileNameLabel.textContent = `Archivo: ${fileName}`;
+      uploadCountBadge.textContent = `${items.length} detectados`;
+      uploadPreviewTableBody.innerHTML = '';
+
+      items.slice(0, 100).forEach((it, idx) => {
+        const row = document.createElement('tr');
+        row.className = "border-b border-white/5 hover:bg-white/5";
+        row.innerHTML = `
+          <td class="py-1 px-2 font-mono text-gray-400 text-[10px]">${idx + 1}</td>
+          <td class="py-1 px-2 font-bold text-white">${escapeString(it.combo)}</td>
+          <td class="py-1 px-2 text-gray-300 text-[11px]">${escapeString(it.question)}</td>
+        `;
+        uploadPreviewTableBody.appendChild(row);
+      });
+
+      uploadPreviewSection.classList.remove('hidden');
+      uploadActionButtons.classList.remove('hidden');
+    }
+
+    function processIncomingFile(file) {
+      if (!file) return;
+
+      const reader = new FileReader();
+      const ext = file.name.split('.').pop().toLowerCase();
+
+      reader.onload = function(e) {
+        try {
+          let rows = [];
+
+          if (ext === 'csv') {
+            const content = e.target.result;
+            rows = parseImportText(content);
+          } else {
+            // Procesamiento de Excel con SheetJS
+            if (typeof XLSX === 'undefined') {
+              showNotification("Librería de Excel no disponible. Usa formato .CSV", "⚠️");
+              return;
+            }
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const sheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonSheet = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+            const textLines = jsonSheet.map(r => {
+              if (!Array.isArray(r) || r.length === 0) return '';
+              const c1 = r[0] !== undefined ? String(r[0]).trim() : '';
+              const c2 = r[1] !== undefined ? String(r[1]).trim() : '';
+              return c2 ? `${c1}\t${c2}` : c1;
+            }).filter(l => l.length > 0).join('\n');
+
+            rows = parseImportText(textLines);
+          }
+
+          if (rows.length < 2) {
+            showNotification("El archivo debe tener al menos 2 preguntas válidas.", "⚠️");
+            return;
+          }
+
+          displayUploadPreview(rows, file.name);
+          showNotification(`Se cargaron ${rows.length} preguntas correctamente`, "📂");
+        } catch (err) {
+          console.error("Error al leer archivo:", err);
+          showNotification("No se pudo procesar el archivo. Revisa el formato.", "❌");
+        }
+      };
+
+      if (ext === 'csv') {
+        reader.readAsText(file);
+      } else {
+        reader.readAsArrayBuffer(file);
+      }
+    }
+
+    // Eventos drag and drop y selector
+    dropZoneContainer.addEventListener('click', () => fileSelectorInput.click());
+    fileSelectorInput.addEventListener('change', (e) => {
+      if (e.target.files && e.target.files[0]) {
+        processIncomingFile(e.target.files[0]);
+      }
+    });
+
+    dropZoneContainer.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZoneContainer.classList.add('border-indigo-400', 'bg-indigo-950/30');
+    });
+
+    dropZoneContainer.addEventListener('dragleave', () => {
+      dropZoneContainer.classList.remove('border-indigo-400', 'bg-indigo-950/30');
+    });
+
+    dropZoneContainer.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZoneContainer.classList.remove('border-indigo-400', 'bg-indigo-950/30');
+      if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+        processIncomingFile(e.dataTransfer.files[0]);
+      }
+    });
+
+    // Descargar plantilla CSV de ejemplo
+    btnDownloadSampleCSV.addEventListener('click', () => {
+      const header = "Segmento (Ruleta),Pregunta o Consigna Completa\n";
+      const body = B1_QUESTIONS_DATASET.map(d => `"${d.combo.replace(/"/g, '""')}","${d.question.replace(/"/g, '""')}"`).join('\n');
+      const blob = new Blob([header + body], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'plantilla_preguntas_b1.csv';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      showNotification("Plantilla CSV descargada", "📥");
+    });
+
+    // Confirmación de archivo
+    btnUploadReplace.addEventListener('click', () => {
+      if (fileParsedItems.length < 2) return;
+      masterItems = JSON.parse(JSON.stringify(fileParsedItems));
+      saveItemsLocally();
+      resetRound();
+      closeModalEditor();
+      showNotification(`¡Ruleta actualizada con ${masterItems.length} ítems!`, "🎉");
+    });
+
+    btnUploadAppend.addEventListener('click', () => {
+      if (fileParsedItems.length === 0) return;
+      masterItems = masterItems.concat(JSON.parse(JSON.stringify(fileParsedItems)));
+      saveItemsLocally();
+      resetRound();
+      closeModalEditor();
+      showNotification(`Se añadieron ${fileParsedItems.length} ítems nuevos`, "➕");
+    });
+
+    /**
+     * PESTAÑA PEGAR DESDE TABLA O TEXTO
+     */
+    function updatePastePreview() {
+      const raw = pasteTextInputArea.value;
+      pasteParsedItems = parseImportText(raw);
+
+      pasteDetectedBadge.textContent = `${pasteParsedItems.length} detectados`;
+      pastePreviewTableBody.innerHTML = '';
+
+      if (pasteParsedItems.length === 0) {
+        pastePreviewTableBody.innerHTML = `
+          <tr>
+            <td colspan="3" class="py-6 text-center text-gray-500 italic">Pega contenido arriba para ver la vista previa aquí...</td>
+          </tr>
+        `;
+        return;
+      }
+
+      pasteParsedItems.slice(0, 100).forEach((it, idx) => {
+        const row = document.createElement('tr');
+        row.className = "border-b border-white/5 hover:bg-white/5";
+        row.innerHTML = `
+          <td class="py-1 px-2 font-mono text-gray-400 text-[10px]">${idx + 1}</td>
+          <td class="py-1 px-2 font-bold text-white">${escapeString(it.combo)}</td>
+          <td class="py-1 px-2 text-gray-300 text-[11px]">${escapeString(it.question)}</td>
+        `;
+        pastePreviewTableBody.appendChild(row);
+      });
+    }
+
+    pasteTextInputArea.addEventListener('input', updatePastePreview);
+
+    btnPasteReplace.addEventListener('click', () => {
+      if (pasteParsedItems.length < 2) {
+        showNotification("Pega al menos 2 preguntas válidas.", "⚠️");
+        return;
+      }
+      masterItems = JSON.parse(JSON.stringify(pasteParsedItems));
+      saveItemsLocally();
+      resetRound();
+      closeModalEditor();
+      showNotification(`¡Ruleta actualizada con ${masterItems.length} preguntas!`, "🎉");
+    });
+
+    btnPasteAppend.addEventListener('click', () => {
+      if (pasteParsedItems.length === 0) {
+        showNotification("No hay ítems para añadir.", "⚠️");
+        return;
+      }
+      masterItems = masterItems.concat(JSON.parse(JSON.stringify(pasteParsedItems)));
+      saveItemsLocally();
+      resetRound();
+      closeModalEditor();
+      showNotification(`Se agregaron ${pasteParsedItems.length} preguntas a la ruleta`, "➕");
+    });
+
+    /**
+     * PESTAÑA EDITOR MANUAL
+     */
+    function renderManualListItems() {
+      manualItemsContainer.innerHTML = '';
+      manualCountBadge.textContent = masterItems.length;
+
+      masterItems.forEach((item, index) => {
+        const div = document.createElement('div');
+        div.className = "bg-white/5 border border-white/10 hover:border-white/20 p-2.5 rounded-xl flex items-center gap-2 transition-colors";
+        div.innerHTML = `
+          <div class="text-[11px] font-mono font-bold text-gray-400 w-6 text-center">
+            #${index + 1}
+          </div>
+          <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-2">
+            <div>
+              <input type="text" data-idx="${index}" data-key="combo" value="${escapeString(item.combo)}" placeholder="Texto en Ruleta" class="w-full bg-black/60 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-indigo-400 font-bold">
+            </div>
+            <div class="sm:col-span-2">
+              <input type="text" data-idx="${index}" data-key="question" value="${escapeString(item.question)}" placeholder="Pregunta completa para el estudiante" class="w-full bg-black/60 border border-white/20 rounded-lg px-2.5 py-1.5 text-xs text-gray-200 focus:outline-none focus:border-indigo-400">
+            </div>
+          </div>
+          <button data-del="${index}" class="text-gray-400 hover:text-red-400 p-2 rounded-lg hover:bg-white/10 transition-colors" title="Eliminar ítem">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+            </svg>
+          </button>
+        `;
+        manualItemsContainer.appendChild(div);
+      });
+
+      // Modificaciones en inputs
+      manualItemsContainer.querySelectorAll('input').forEach(inp => {
+        inp.addEventListener('input', (e) => {
+          const idx = parseInt(e.target.dataset.idx);
+          const key = e.target.dataset.key;
+          masterItems[idx][key] = e.target.value.trim();
+        });
+      });
+
+      // Eliminación de ítems
+      manualItemsContainer.querySelectorAll('[data-del]').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+          if (masterItems.length <= 2) {
+            showNotification("La ruleta debe conservar al menos 2 ítems.", "⚠️");
+            return;
+          }
+          const idx = parseInt(e.currentTarget.dataset.del);
+          masterItems.splice(idx, 1);
+          renderManualListItems();
+        });
+      });
+    }
+
+    btnAddNewSlice.addEventListener('click', () => {
+      masterItems.push({
+        combo: "new skill",
+        question: "What is a new skill you would like to develop?"
+      });
+      renderManualListItems();
+      setTimeout(() => {
+        manualItemsContainer.scrollTop = manualItemsContainer.scrollHeight;
+      }, 40);
+    });
+
+    btnSaveManualList.addEventListener('click', () => {
+      masterItems = masterItems.filter(i => i.combo.trim().length > 0);
+      if (masterItems.length < 2) {
+        showNotification("Proporciona al menos 2 ítems válidos.", "⚠️");
+        return;
+      }
+      saveItemsLocally();
+      resetRound();
+      closeModalEditor();
+      showNotification("Cambios manuales guardados en la ruleta", "💾");
+    });
+
+    // Botón de 1 clic para cargar el banco B1
+    btnQuickLoadB1Preset.addEventListener('click', () => {
+      masterItems = JSON.parse(JSON.stringify(B1_QUESTIONS_DATASET));
+      saveItemsLocally();
+      renderManualListItems();
+      resetRound();
+      closeModalEditor();
+      showNotification("Se cargaron las 20 preguntas B1 por defecto", "⚡");
+    });
+
+    btnResetToDefaultsFooter.addEventListener('click', () => {
+      masterItems = JSON.parse(JSON.stringify(B1_QUESTIONS_DATASET));
+      saveItemsLocally();
+      renderManualListItems();
+      resetRound();
+      closeModalEditor();
+      showNotification("Se restauró el listado original B1", "🔄");
+    });
+
+    /**
+     * NAVEGACIÓN DE PESTAÑAS EN EL MODAL DE IMPORTACIÓN
+     */
+    function switchTab(target) {
+      tabBtnUpload.className = "px-4 py-2.5 border-b-2 text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 " +
+        (target === 'upload' ? 'border-indigo-500 text-white' : 'border-transparent text-gray-400 hover:text-white');
+      tabBtnPaste.className = "px-4 py-2.5 border-b-2 text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 " +
+        (target === 'paste' ? 'border-indigo-500 text-white' : 'border-transparent text-gray-400 hover:text-white');
+      tabBtnManual.className = "px-4 py-2.5 border-b-2 text-xs sm:text-sm font-semibold transition-colors flex items-center gap-1.5 " +
+        (target === 'manual' ? 'border-indigo-500 text-white' : 'border-transparent text-gray-400 hover:text-white');
+
+      tabContentUpload.classList.toggle('hidden', target !== 'upload');
+      tabContentPaste.classList.toggle('hidden', target !== 'paste');
+      tabContentManual.classList.toggle('hidden', target !== 'manual');
+
+      if (target === 'manual') renderManualListItems();
+      if (target === 'paste') updatePastePreview();
+    }
+
+    tabBtnUpload.addEventListener('click', () => switchTab('upload'));
+    tabBtnPaste.addEventListener('click', () => switchTab('paste'));
+    tabBtnManual.addEventListener('click', () => switchTab('manual'));
+
+    function openModalEditor() {
+      switchTab('upload');
+      importModal.classList.remove('opacity-0', 'pointer-events-none');
+    }
+
+    function closeModalEditor() {
+      importModal.classList.add('opacity-0', 'pointer-events-none');
+    }
+
+    btnOpenImportModal.addEventListener('click', openModalEditor);
+    btnCloseImportModal.addEventListener('click', closeModalEditor);
+    btnDismissModalFooter.addEventListener('click', closeModalEditor);
+
+    /**
+     * CONTROLES GLOBALES
+     */
+    btnSoundToggle.addEventListener('click', () => {
+      isSoundMuted = !isSoundMuted;
+      iconSoundOn.classList.toggle('hidden', isSoundMuted);
+      iconSoundOff.classList.toggle('hidden', !isSoundMuted);
+      showNotification(isSoundMuted ? "Sonido desactivado" : "Sonido activado", isSoundMuted ? "🔇" : "🔊");
+    });
+
+    btnFullscreenToggle.addEventListener('click', () => {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      } else {
+        if (document.exitFullscreen) document.exitFullscreen();
+      }
+    });
+
+    btnSpinWheel.addEventListener('click', spin);
+    canvas.addEventListener('click', spin);
+    window.addEventListener('resize', adjustCanvasDPI);
+
+    function escapeString(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    // Cronómetro de clase
+    let seconds = 0;
+    setInterval(() => {
+      seconds++;
+      const m = Math.floor(seconds / 60);
+      const s = seconds % 60;
+      sessionTimer.textContent = `${m}:${s < 10 ? '0' : ''}${s}`;
+    }, 1000);
+
+    // Inicialización al cargar la ventana
+    window.onload = function() {
+      loadSavedItems();
+      activeWheelItems = JSON.parse(JSON.stringify(masterItems));
+      updateHeaderStats();
+      adjustCanvasDPI();
+    };
+  </script>
+</body>
+</html>
