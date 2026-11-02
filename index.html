@@ -1629,11 +1629,54 @@
       saveHistorySnapshot();
     }
 
+
+    // ==========================================
+    // ALEATORIEDAD DE OPCIONES EN MENÚS DESPLEGABLES (<select>)
+    // Algoritmo Fisher-Yates respetando la opción neutra inicial y data-answer
+    // ==========================================
+    function shuffleSelectHtmlOptions(rawHtml) {
+      if (!rawHtml || typeof rawHtml !== 'string') return rawHtml;
+      return rawHtml.replace(/(<select\b[^>]*>)([\s\S]*?)(<\/select>)/gi, (match, openTag, innerOptions, closeTag) => {
+        const optRegex = /<option\b[^>]*>[\s\S]*?<\/option>/gi;
+        const allOptions = innerOptions.match(optRegex);
+        if (!allOptions || allOptions.length <= 2) return match;
+
+        const firstOpt = allOptions[0];
+        const isPlaceholder = /value\s*=\s*["']["']/i.test(firstOpt) || 
+                              /--|select|choose|elige/i.test(firstOpt) ||
+                              (!/data-answer|data-correct/i.test(firstOpt) && /value\s*=\s*["']\s*["']/i.test(firstOpt));
+
+        let fixedHeader = '';
+        let optionsToShuffle = [];
+
+        if (isPlaceholder) {
+          fixedHeader = firstOpt;
+          optionsToShuffle = allOptions.slice(1);
+        } else {
+          optionsToShuffle = allOptions.slice(0);
+        }
+
+        if (optionsToShuffle.length <= 1) return match;
+
+        // Algoritmo Fisher-Yates para barajar las opciones
+        for (let i = optionsToShuffle.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          const temp = optionsToShuffle[i];
+          optionsToShuffle[i] = optionsToShuffle[j];
+          optionsToShuffle[j] = temp;
+        }
+
+        const newInner = (fixedHeader ? fixedHeader : '') + optionsToShuffle.join('');
+        return openTag + newInner + closeTag;
+      });
+    }
+
     function loadSlide(index, trackHistory = false) {
       if (index < 0 || index >= slides.length) return;
       currentSlideIndex = index;
       renderSlidesList();
-      document.getElementById('slideViewer').srcdoc = slides[currentSlideIndex].html;
+      const slideContent = (slides[currentSlideIndex] && slides[currentSlideIndex].html) || '';
+      document.getElementById('slideViewer').srcdoc = shuffleSelectHtmlOptions(slideContent);
       if (trackHistory) saveHistorySnapshot();
     }
 
@@ -2239,6 +2282,7 @@ NUNCA incrustes estas imágenes de referencia en el código HTML.\n`;
    - Ergonomía Móvil Estricta: En pantallas pequeñas, apila siempre las imágenes o reproductores en la parte superior con altura contenida (h-40 a h-52), dejando libre el espacio inferior para que los botones interactivos táctiles (mínimo 42px de alto) nunca se desborden horizontalmente.
 
 2. CRITERIO PEDAGÓGICO Y TOLERANCIA:
+   - PROHIBICIÓN ESTRICTA DE PLACEHOLDERS Y RESPUESTAS PRELLENADAS: Queda TERMINANTEMENTE PROHIBIDO incluir respuestas prellenadas, valores por defecto o atributos 'placeholder' con texto de ayuda en los campos de entrada (<input>, <textarea>). Los campos de escritura para el estudiante deben generarse SIEMPRE 100% vacíos (value="" y sin atributo placeholder que contenga respuestas o pistas obvias).
    - Si una actividad requiere consultar un texto largo previo (como un Reading), preséntalo en la parte superior en un acordeón accesible '<details open class="ref-details">' con fondo tenue para no forzar scroll excesivo.
    - En campos de texto abierto (<input>), incluye siempre el atributo 'data-answer' con la clave principal y, si aplica, alternativas comunes en 'data-alts' o una función normalizeText() en JS que ignore diferencias menores de puntuación/mayúsculas.
    - Para compatibilidad con el Inspector de Preguntas, CADA input interactivo, select o botón de opción DEBE tener su respectivo 'data-answer'.
@@ -2276,6 +2320,7 @@ REGLAS DE RESPONSIVIDAD Y EXPERIENCIA MÓVIL (ESTRICTO):
    - Tipografía legible sin zoom: mínimo 14px (text-sm) para textos y 15-16px para inputs/selects para evitar el auto-zoom de iOS.
 5. Lógica Pedagógica, Métricas y Calificación:
    - Si hay un Answer Key, úsalo como verdad absoluta sin revelar respuestas de antemano.
+   - PROHIBICIÓN DE PLACEHOLDERS: Los campos de entrada (<input>, <textarea>) deben generarse SIEMPRE 100% vacíos. Está estrictamente prohibido colocar respuestas prellenadas o atributos placeholder con pistas o la solución.
    - CONTRATO OBLIGATORIO DE MÉTRICAS PEDAGÓGICAS (ANALÍTICA Y SESIONES EN VIVO):
      Cada diapositiva DEBE declarar al inicio de su script:
      window.ACTIVITY_METRICS = {
@@ -2579,10 +2624,29 @@ ${!isRefining && extraNotes ? `\nNOTA ADICIONAL DEL PROFESOR: ${extraNotes}` : '
 '    const payload = "' + encodedDeckData + '";\n' +
 '    const deck = JSON.parse(decodeURIComponent(escape(atob(payload))));\n' +
 '    let current = 0;\n' +
+'    function shuffleSelects(rawHtml) {\n' +
+'      if (!rawHtml || typeof rawHtml !== "string") return rawHtml;\n' +
+'      return rawHtml.replace(/(<select\\b[^>]*>)([\\s\\S]*?)(<\\/select>)/gi, (m, openTag, inner, closeTag) => {\n' +
+'        const opts = inner.match(/<option\\b[^>]*>[\\s\\S]*?<\\/option>/gi);\n' +
+'        if (!opts || opts.length <= 2) return m;\n' +
+'        const first = opts[0];\n' +
+'        const isPlh = /value\\s*=\\s*["\x27]["\x27]/i.test(first) || /--|select|choose|elige/i.test(first);\n' +
+'        let header = isPlh ? first : "";\n' +
+'        let toShuffle = isPlh ? opts.slice(1) : opts.slice(0);\n' +
+'        if (toShuffle.length <= 1) return m;\n' +
+'        for (let i = toShuffle.length - 1; i > 0; i--) {\n' +
+'          const j = Math.floor(Math.random() * (i + 1));\n' +
+'          const t = toShuffle[i];\n' +
+'          toShuffle[i] = toShuffle[j];\n' +
+'          toShuffle[j] = t;\n' +
+'        }\n' +
+'        return openTag + (header ? header : "") + toShuffle.join("") + closeTag;\n' +
+'      });\n' +
+'    }\n' +
 '    function show(idx) {\n' +
 '      if (idx < 0 || idx >= deck.length) return;\n' +
 '      current = idx;\n' +
-'      document.getElementById("viewer").srcdoc = deck[current].html;\n' +
+'      document.getElementById("viewer").srcdoc = shuffleSelects(deck[current].html);\n' +
 '      document.getElementById("counter").textContent = (current + 1) + " / " + deck.length;\n' +
 '    }\n' +
 '    function prev() { if (current > 0) show(current - 1); }\n' +
