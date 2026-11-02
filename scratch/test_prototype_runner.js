@@ -1,0 +1,186 @@
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+const testHtml = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"></head>
+<body>
+<pre id="results"></pre>
+
+<script>
+// --- SHUFFLE EXERCISE OPTIONS IMPLEMENTATION ---
+function shuffleExerciseOptions(rawHtml) {
+  if (!rawHtml || typeof rawHtml !== 'string') return rawHtml;
+
+  try {
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(rawHtml, 'text/html');
+
+    // Helper: Fisher-Yates shuffle array in-place
+    function fyShuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        const t = arr[i];
+        arr[i] = arr[j];
+        arr[j] = t;
+      }
+      return arr;
+    }
+
+    // Helper: shuffle a list of DOM elements inside their common parent container
+    function shuffleElementsInParent(elements, parent) {
+      if (!elements || elements.length <= 1) return;
+      const p = parent || elements[0].parentElement;
+      if (!p) return;
+
+      // Create a temporary anchor right before the first element
+      const firstEl = elements[0];
+      const anchor = document.createComment('shuffle-anchor');
+      p.insertBefore(anchor, firstEl);
+
+      // Clone elements array and shuffle
+      const shuffled = fyShuffle(elements.slice(0));
+
+      // Re-insert shuffled elements right after anchor
+      let ref = anchor;
+      shuffled.forEach(el => {
+        p.insertBefore(el, ref.nextSibling);
+        ref = el;
+      });
+
+      anchor.remove();
+    }
+
+    // 1. SHUFFLE <select> OPTIONS
+    doc.querySelectorAll('select').forEach(sel => {
+      const opts = Array.from(sel.querySelectorAll('option'));
+      if (opts.length <= 2) return;
+
+      const first = opts[0];
+      const isPlh = first.value === '' ||
+        /--|select|choose|elige/i.test(first.textContent) ||
+        (!first.hasAttribute('data-answer') && !first.hasAttribute('data-correct') && !first.value.trim());
+
+      const toShuffle = isPlh ? opts.slice(1) : opts.slice(0);
+      if (toShuffle.length <= 1) return;
+
+      fyShuffle(toShuffle);
+
+      // Rebuild <select>
+      if (isPlh) {
+        sel.appendChild(first);
+      }
+      toShuffle.forEach(o => sel.appendChild(o));
+    });
+
+    // 2. SHUFFLE RADIO GROUPS (input[type="radio"])
+    const radioGroups = {};
+    doc.querySelectorAll('input[type="radio"][name]').forEach(r => {
+      const name = r.getAttribute('name');
+      if (!radioGroups[name]) radioGroups[name] = [];
+      radioGroups[name].push(r);
+    });
+
+    Object.values(radioGroups).forEach(radios => {
+      if (radios.length <= 1) return;
+      // Identify item element: wrapper <label> or direct container or input
+      const items = radios.map(r => r.closest('label') || r.closest('.radio-option') || r.parentElement || r);
+      const parent = items[0].parentElement;
+      if (!parent) return;
+      const allSameParent = items.every(it => it.parentElement === parent);
+      const allUnique = (new Set(items)).size === items.length;
+      if (allSameParent && allUnique) {
+        shuffleElementsInParent(items, parent);
+      }
+    });
+
+    // 3. SHUFFLE MULTIPLE CHOICE BUTTONS / GROUPS
+    const btnGroups = {};
+    const qButtons = doc.querySelectorAll('button[data-question], button[data-q], button[data-item]');
+    qButtons.forEach(btn => {
+      if (btn.matches('#check-btn, #reset-btn, [onclick*="check"], [onclick*="reset"], [onclick*="toggle"]')) return;
+      const q = btn.getAttribute('data-question') || btn.getAttribute('data-q') || btn.getAttribute('data-item');
+      if (!btnGroups[q]) btnGroups[q] = [];
+      btnGroups[q].push(btn);
+    });
+
+    const shuffledBtnParents = new Set();
+
+    Object.values(btnGroups).forEach(btns => {
+      if (btns.length <= 1) return;
+      const parent = btns[0].parentElement;
+      if (!parent) return;
+      const allSame = btns.every(b => b.parentElement === parent);
+      if (allSame) {
+        shuffleElementsInParent(btns, parent);
+        shuffledBtnParents.add(parent);
+      }
+    });
+
+    const choiceContainers = doc.querySelectorAll('.options-group, .choice-group, .btn-group, [data-choice-group], [data-options], [id^="options-"]');
+    choiceContainers.forEach(cont => {
+      if (shuffledBtnParents.has(cont)) return;
+      const btns = Array.from(cont.querySelectorAll('button:not(#check-btn):not(#reset-btn):not([onclick*="check"]):not([onclick*="reset"]):not([onclick*="toggle"])'));
+      if (btns.length > 1) {
+        const directParent = btns[0].parentElement;
+        const allSame = btns.every(b => b.parentElement === directParent);
+        if (allSame) {
+          shuffleElementsInParent(btns, directParent);
+          shuffledBtnParents.add(directParent);
+        }
+      }
+    });
+
+    // 4. SHUFFLE WORD BANKS AND MATCHING CHIP CONTAINERS
+    const bankContainers = doc.querySelectorAll('.word-bank, .wordbank, [data-word-bank], .chips-container, [data-chips], [data-matching-options], .matching-options, .match-targets');
+    bankContainers.forEach(bank => {
+      const children = Array.from(bank.children);
+      const chips = children.filter(c => {
+        const text = c.textContent.trim();
+        if (/^(word\\s*bank|vocabulary\\s*bank|adverb\\s*bank|verbs?\\s*bank):?$/i.test(text)) return false;
+        if (c.matches('h1, h2, h3, h4, h5, h6, [class*="uppercase"]')) {
+          if (text.includes(':') || /bank/i.test(text)) return false;
+        }
+        return true;
+      });
+
+      if (chips.length > 1) {
+        shuffleElementsInParent(chips, bank);
+      }
+    });
+
+    const docTypeStr = (rawHtml.trim().startsWith('<!DOCTYPE') || doc.doctype) ? '<!DOCTYPE html>\\n' : '';
+    return docTypeStr + doc.documentElement.outerHTML;
+  } catch (err) {
+    console.warn('Error in shuffleExerciseOptions:', err);
+    return rawHtml;
+  }
+}
+
+// TEST CASES
+const testCases = [];
+testCases.push({ name: 'Select', html: '<select><option value="">-- Choose --</option><option value="1">Alpha</option><option value="2">Beta</option><option value="3">Gamma</option></select>' });
+testCases.push({ name: 'Radios', html: '<div class="space-y-2"><label><input type="radio" name="q1" value="A"><span>Alpha</span></label><label><input type="radio" name="q1" value="B"><span>Beta</span></label><label><input type="radio" name="q1" value="C"><span>Gamma</span></label></div>' });
+testCases.push({ name: 'Buttons data-question', html: '<div class="grid"><button data-question="1" data-option="A">A</button><button data-question="1" data-option="B">B</button><button data-question="1" data-option="C">C</button></div>' });
+testCases.push({ name: 'Word Bank', html: '<div class="word-bank"><span class="uppercase">Word Bank:</span><span class="chip">do</span><span class="chip">make</span><span class="chip">take</span><span class="chip">get</span></div>' });
+
+const out = [];
+testCases.forEach(tc => {
+  out.push('--- ' + tc.name + ' ---');
+  out.push('Original: ' + tc.html);
+  out.push('Shuffled: ' + shuffleExerciseOptions(tc.html));
+});
+
+document.getElementById('results').textContent = out.join('\\n');
+</script>
+</body>
+</html>`;
+
+fs.writeFileSync('scratch/test_prototype.html', testHtml);
+
+const chromePath = 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const filePath = path.resolve('scratch/test_prototype.html').replace(/\\/g, '/');
+const cmd = `"${chromePath}" --headless --disable-gpu --dump-dom "file:///${filePath}"`;
+const output = execSync(cmd, { encoding: 'utf8' });
+console.log(output);
