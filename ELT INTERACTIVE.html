@@ -1631,17 +1631,22 @@
 
 
     // ==========================================
-    // ALEATORIEDAD UNIVERSAL DE OPCIONES EN EJERCICIOS
-    // Algoritmo Fisher-Yates para select, botones/radios de opción múltiple,
-    // bancos de palabras y ejercicios de matching/emparejamiento,
-    // preservando atributos de validación (data-answer, data-correct, etc.)
+    // ALEATORIEDAD UNIVERSAL POR CONTRATOS EXPLÍCITOS
+    // 100% desacoplada y libre de heurísticas.
+    // Opera exclusivamente sobre:
+    // 1. Contenedores con atributo explícito [data-shuffle] (baraja hijos directos)
+    // 2. Menús desplegables nativos (<select>)
+    // 3. Grupos de opciones tipo radio (input[type="radio"])
+    // 4. Botones de opción múltiple (button[data-question])
     // ==========================================
     function shuffleExerciseOptions(rawHtml) {
       if (!rawHtml || typeof rawHtml !== 'string') return rawHtml;
+
       try {
         const parser = new DOMParser();
         const doc = parser.parseFromString(rawHtml, 'text/html');
 
+        // Algoritmo Fisher-Yates in-place
         function fyShuffle(arr) {
           for (let i = arr.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
@@ -1650,6 +1655,7 @@
           return arr;
         }
 
+        // Baraja elementos directos dentro de su contenedor padre
         function shuffleElements(elements, parent) {
           if (!elements || elements.length <= 1) return;
           const p = parent || elements[0].parentElement;
@@ -1662,7 +1668,19 @@
           anchor.remove();
         }
 
-        // 1. Menús desplegables (<select>) respetando opción neutra inicial
+        // 1. CONTRATO EXPLÍCITO data-shuffle (Matching, Bancos de Palabras, Tarjetas de Opciones)
+        // Baraja ÚNICAMENTE los hijos directos de primer nivel (sin tocar jamás sus nodos internos)
+        doc.querySelectorAll('[data-shuffle], [data-shuffle-children]').forEach(container => {
+          const directChildren = Array.from(container.children).filter(child => {
+            return !child.matches('#check-btn, #reset-btn, [data-no-shuffle], h1, h2, h3, h4, h5, h6');
+          });
+          if (directChildren.length > 1) {
+            shuffleElements(directChildren, container);
+          }
+        });
+
+        // 2. MENÚS DESPLEGABLES NATIVOS (<select>)
+        // Baraja opciones respetando la opción neutra/placeholder inicial
         doc.querySelectorAll('select').forEach(sel => {
           const opts = Array.from(sel.querySelectorAll('option'));
           if (opts.length <= 2) return;
@@ -1677,7 +1695,8 @@
           toShuffle.forEach(o => sel.appendChild(o));
         });
 
-        // 2. Grupos de inputs de tipo radio (input[type="radio"])
+        // 3. GRUPOS DE RADIO BUTTONS NATIVOS (input[type="radio"])
+        // Agrupa por atributo name y baraja los elementos de opción dentro de su contenedor común
         const radioGroups = {};
         doc.querySelectorAll('input[type="radio"][name]').forEach(r => {
           const name = r.getAttribute('name');
@@ -1694,52 +1713,20 @@
           }
         });
 
-        // 3. Botones y opciones de selección múltiple (data-question / data-q / data-item)
+        // 4. GRUPOS DE BOTONES CON data-question (Opción Múltiple / T-F-DS)
         const btnGroups = {};
-        doc.querySelectorAll('button[data-question], button[data-q], button[data-item]').forEach(btn => {
+        doc.querySelectorAll('button[data-question], button[data-q]').forEach(btn => {
           if (btn.matches('#check-btn, #reset-btn, [onclick*="check"], [onclick*="reset"], [onclick*="toggle"]')) return;
-          const q = btn.getAttribute('data-question') || btn.getAttribute('data-q') || btn.getAttribute('data-item');
+          const q = btn.getAttribute('data-question') || btn.getAttribute('data-q');
           if (!btnGroups[q]) btnGroups[q] = [];
           btnGroups[q].push(btn);
         });
-        const shuffledParents = new Set();
         Object.values(btnGroups).forEach(btns => {
           if (btns.length <= 1) return;
           const parent = btns[0].parentElement;
           if (parent && btns.every(b => b.parentElement === parent)) {
             shuffleElements(btns, parent);
-            shuffledParents.add(parent);
           }
-        });
-
-        // Contenedores de botones de opción (.options-group, .choice-group, .btn-group, [data-choice-group], etc.)
-        doc.querySelectorAll('.options-group, .choice-group, .btn-group, [data-choice-group], [data-options], [id^="options-"]').forEach(cont => {
-          if (shuffledParents.has(cont)) return;
-          const btns = Array.from(cont.querySelectorAll('button:not(#check-btn):not(#reset-btn):not([onclick*="check"]):not([onclick*="reset"]):not([onclick*="toggle"])'));
-          if (btns.length > 1) {
-            const directParent = btns[0].parentElement;
-            if (directParent && btns.every(b => b.parentElement === directParent)) {
-              shuffleElements(btns, directParent);
-              shuffledParents.add(directParent);
-            }
-          }
-        });
-
-        // 4. Bancos de palabras (Word Banks) y ejercicios de emparejamiento / matching
-        const bankContainers = new Set(doc.querySelectorAll('.word-bank, .wordbank, [data-word-bank], .chips-container, [data-chips], [data-matching-options], .matching-options, .match-targets, .matching-targets, .matching-column'));
-        doc.querySelectorAll('span, h2, h3, h4, h5, div, p').forEach(el => {
-          if (el.children.length === 0 && /(word|vocabulary|adverb|verbs?)\s*bank:?/i.test(el.textContent.trim())) {
-            if (el.parentElement) bankContainers.add(el.parentElement);
-          }
-        });
-        bankContainers.forEach(bank => {
-          const chips = Array.from(bank.children).filter(c => {
-            const text = c.textContent.trim();
-            if (/(word|vocabulary|adverb|verbs?)\s*bank:?/i.test(text)) return false;
-            if (c.matches('h1, h2, h3, h4, h5, h6, [class*="uppercase"]') && (text.includes(':') || /bank/i.test(text))) return false;
-            return true;
-          });
-          if (chips.length > 1) shuffleElements(chips, bank);
         });
 
         const docTypeStr = (rawHtml.trim().startsWith('<!DOCTYPE') || doc.doctype) ? '<!DOCTYPE html>\n' : '';
@@ -2363,7 +2350,7 @@ NUNCA incrustes estas imágenes de referencia en el código HTML.\n`;
 
 2. CRITERIO PEDAGÓGICO Y TOLERANCIA:
    - PROHIBICIÓN ESTRICTA DE PLACEHOLDERS Y RESPUESTAS PRELLENADAS: Queda TERMINANTEMENTE PROHIBIDO incluir respuestas prellenadas, valores por defecto o atributos 'placeholder' con texto de ayuda en los campos de entrada (<input>, <textarea>). Los campos de escritura para el estudiante deben generarse SIEMPRE 100% vacíos (value="" y sin atributo placeholder que contenga respuestas o pistas obvias).
-   - ALEATORIZACIÓN UNIVERSAL DE OPCIONES: La plataforma aplica una aleatorización automática a cualquier ejercicio con opciones (preguntas de opción múltiple con botones o radios, menús desplegables <select>, bancos de palabras y ejercicios de matching/emparejamiento). Por ello, debes generar las opciones con sus atributos de validación claros (ej. data-answer, data-correct, data-option, data-question) asegurando que nunca dependan del orden estático original del libro de texto.
+   - CONTRATO DE ALEATORIZACIÓN (data-shuffle): La plataforma baraja automáticamente en tiempo de ejecución las opciones de los ejercicios. Cuando generes una columna de opciones/definiciones para matching o un banco de palabras (word bank), envuelve esos elementos en un contenedor con el atributo data-shuffle. NUNCA coloques data-shuffle en la columna de premisas/términos de anclaje ni en contenedores de orden fijo.
    - Si una actividad requiere consultar un texto largo previo (como un Reading), preséntalo en la parte superior en un acordeón accesible '<details open class="ref-details">' con fondo tenue para no forzar scroll excesivo.
    - En campos de texto abierto (<input>), incluye siempre el atributo 'data-answer' con la clave principal y, si aplica, alternativas comunes en 'data-alts' o una función normalizeText() en JS que ignore diferencias menores de puntuación/mayúsculas.
    - Para compatibilidad con el Inspector de Preguntas, CADA input interactivo, select o botón de opción DEBE tener su respectivo 'data-answer'.
@@ -2402,7 +2389,7 @@ REGLAS DE RESPONSIVIDAD Y EXPERIENCIA MÓVIL (ESTRICTO):
 5. Lógica Pedagógica, Métricas y Calificación:
    - Si hay un Answer Key, úsalo como verdad absoluta sin revelar respuestas de antemano.
    - PROHIBICIÓN DE PLACEHOLDERS: Los campos de entrada (<input>, <textarea>) deben generarse SIEMPRE 100% vacíos. Está estrictamente prohibido colocar respuestas prellenadas o atributos placeholder con pistas o la solución.
-   - ALEATORIZACIÓN UNIVERSAL DE OPCIONES: La aleatorización se aplica de forma universal a cualquier ejercicio de opciones (opción múltiple con botones o radios, menús desplegables <select>, emparejamiento/matching y bancos de palabras). Diseña siempre las opciones con sus atributos de validación correspondientes (data-answer, data-correct, data-option, data-question, etc.), garantizando que las opciones nunca se presenten en el orden original del libro de texto.
+   - CONTRATO DE ALEATORIZACIÓN (data-shuffle): La plataforma baraja automáticamente en tiempo de ejecución las opciones de los ejercicios. Cuando generes una columna de opciones/definiciones para matching o un banco de palabras (word bank), envuelve esos elementos en un contenedor con el atributo data-shuffle. NUNCA coloques data-shuffle en la columna de premisas/términos de anclaje ni en contenedores de orden fijo.
    - CONTRATO OBLIGATORIO DE MÉTRICAS PEDAGÓGICAS (ANALÍTICA Y SESIONES EN VIVO):
      Cada diapositiva DEBE declarar al inicio de su script:
      window.ACTIVITY_METRICS = {
@@ -2729,6 +2716,14 @@ ${!isRefining && extraNotes ? `\nNOTA ADICIONAL DEL PROFESOR: ${extraNotes}` : '
 '          shuffled.forEach(el => { p.insertBefore(el, ref.nextSibling); ref = el; });\n' +
 '          anchor.remove();\n' +
 '        }\n' +
+'        doc.querySelectorAll("[data-shuffle], [data-shuffle-children]").forEach(container => {\n' +
+'          const directChildren = Array.from(container.children).filter(child => {\n' +
+'            return !child.matches("#check-btn, #reset-btn, [data-no-shuffle], h1, h2, h3, h4, h5, h6");\n' +
+'          });\n' +
+'          if (directChildren.length > 1) {\n' +
+'            shuffleElements(directChildren, container);\n' +
+'          }\n' +
+'        });\n' +
 '        doc.querySelectorAll("select").forEach(sel => {\n' +
 '          const opts = Array.from(sel.querySelectorAll("option"));\n' +
 '          if (opts.length <= 2) return;\n' +
@@ -2756,46 +2751,18 @@ ${!isRefining && extraNotes ? `\nNOTA ADICIONAL DEL PROFESOR: ${extraNotes}` : '
 '          }\n' +
 '        });\n' +
 '        const btnGroups = {};\n' +
-'        doc.querySelectorAll("button[data-question], button[data-q], button[data-item]").forEach(btn => {\n' +
+'        doc.querySelectorAll("button[data-question], button[data-q]").forEach(btn => {\n' +
 '          if (btn.matches("#check-btn, #reset-btn, [onclick*=check], [onclick*=reset], [onclick*=toggle]")) return;\n' +
-'          const q = btn.getAttribute("data-question") || btn.getAttribute("data-q") || btn.getAttribute("data-item");\n' +
+'          const q = btn.getAttribute("data-question") || btn.getAttribute("data-q");\n' +
 '          if (!btnGroups[q]) btnGroups[q] = [];\n' +
 '          btnGroups[q].push(btn);\n' +
 '        });\n' +
-'        const shuffledParents = new Set();\n' +
 '        Object.values(btnGroups).forEach(btns => {\n' +
 '          if (btns.length <= 1) return;\n' +
 '          const parent = btns[0].parentElement;\n' +
 '          if (parent && btns.every(b => b.parentElement === parent)) {\n' +
 '            shuffleElements(btns, parent);\n' +
-'            shuffledParents.add(parent);\n' +
 '          }\n' +
-'        });\n' +
-'        doc.querySelectorAll(".options-group, .choice-group, .btn-group, [data-choice-group], [data-options], [id^=options-]").forEach(cont => {\n' +
-'          if (shuffledParents.has(cont)) return;\n' +
-'          const btns = Array.from(cont.querySelectorAll("button:not(#check-btn):not(#reset-btn):not([onclick*=check]):not([onclick*=reset]):not([onclick*=toggle])"));\n' +
-'          if (btns.length > 1) {\n' +
-'            const directParent = btns[0].parentElement;\n' +
-'            if (directParent && btns.every(b => b.parentElement === directParent)) {\n' +
-'              shuffleElements(btns, directParent);\n' +
-'              shuffledParents.add(directParent);\n' +
-'            }\n' +
-'          }\n' +
-'        });\n' +
-'        const bankContainers = new Set(doc.querySelectorAll(".word-bank, .wordbank, [data-word-bank], .chips-container, [data-chips], [data-matching-options], .matching-options, .match-targets, .matching-targets, .matching-column"));\n' +
-'        doc.querySelectorAll("span, h2, h3, h4, h5, div, p").forEach(el => {\n' +
-'          if (el.children.length === 0 && /(word|vocabulary|adverb|verbs?)\\s*bank:?/i.test(el.textContent.trim())) {\n' +
-'            if (el.parentElement) bankContainers.add(el.parentElement);\n' +
-'          }\n' +
-'        });\n' +
-'        bankContainers.forEach(bank => {\n' +
-'          const chips = Array.from(bank.children).filter(c => {\n' +
-'            const text = c.textContent.trim();\n' +
-'            if (/(word|vocabulary|adverb|verbs?)\\s*bank:?/i.test(text)) return false;\n' +
-'            if (c.matches("h1, h2, h3, h4, h5, h6, [class*=uppercase]") && (text.includes(":") || /bank/i.test(text))) return false;\n' +
-'            return true;\n' +
-'          });\n' +
-'          if (chips.length > 1) shuffleElements(chips, bank);\n' +
 '        });\n' +
 '        const docTypeStr = (rawHtml.trim().startsWith("<!DOCTYPE") || doc.doctype) ? "<!DOCTYPE html>\\\\n" : "";\n' +
 '        return docTypeStr + doc.documentElement.outerHTML;\n' +
