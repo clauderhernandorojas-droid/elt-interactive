@@ -1690,6 +1690,14 @@
             (!first.hasAttribute('data-answer') && !first.hasAttribute('data-correct') && !first.value.trim());
           const toShuffle = isPlh ? opts.slice(1) : opts.slice(0);
           if (toShuffle.length <= 1) return;
+          const prefixRegex = /^([a-z0-9]{1,2}[\.\)]\s+|[a-z0-9]{1,2}\s*[-–—]\s+|\([a-z0-9]{1,2}\)\s*)/i;
+          toShuffle.forEach(o => {
+            const m = o.textContent.match(prefixRegex);
+            if (m) {
+              const cleaned = o.textContent.slice(m[0].length).trim();
+              if (cleaned.length > 0) o.textContent = cleaned;
+            }
+          });
           fyShuffle(toShuffle);
           if (isPlh) sel.appendChild(first);
           toShuffle.forEach(o => sel.appendChild(o));
@@ -1728,6 +1736,14 @@
             shuffleElements(btns, parent);
           }
         });
+
+        // Inyectar script runtime ligero para barajar elementos creados tardíamente por JS en el iframe
+        if (!doc.getElementById('injected-runtime-shuffle')) {
+          const scr = doc.createElement('script');
+          scr.id = 'injected-runtime-shuffle';
+          scr.textContent = `(function() {\n  function runShuffle() {\n    const prefixRegex = /^([a-z0-9]{1,2}[\\.\\)]\\s+|[a-z0-9]{1,2}\\s*[-–—]\\s+|\\([a-z0-9]{1,2}\\)\\s*)/i;\n    document.querySelectorAll('select').forEach(sel => {\n      const options = Array.from(sel.querySelectorAll('option'));\n      if (options.length <= 1) return;\n      const hasPlaceholder = options[0].disabled || options[0].value === "" || /choose|select/i.test(options[0].textContent);\n      const first = hasPlaceholder ? options.shift() : null;\n      options.forEach(opt => {\n        opt.textContent = opt.textContent.replace(prefixRegex, '');\n      });\n      for (let i = options.length - 1; i > 0; i--) {\n        const j = Math.floor(Math.random() * (i + 1));\n        [options[i], options[j]] = [options[j], options[i]];\n      }\n      sel.innerHTML = '';\n      if (first) sel.appendChild(first);\n      options.forEach(opt => sel.appendChild(opt));\n    });\n    document.querySelectorAll('[data-shuffle]').forEach(parent => {\n      const children = Array.from(parent.children).filter(el => !el.hasAttribute('data-no-shuffle'));\n      for (let i = children.length - 1; i > 0; i--) {\n        const j = Math.floor(Math.random() * (i + 1));\n        [children[i], children[j]] = [children[j], children[i]];\n      }\n      children.forEach(el => parent.appendChild(el));\n    });\n  }\n  window.addEventListener('load', () => setTimeout(runShuffle, 0));\n  if (document.readyState === 'complete') setTimeout(runShuffle, 0);\n})();`;
+          (doc.body || doc.documentElement).appendChild(scr);
+        }
 
         const docTypeStr = (rawHtml.trim().startsWith('<!DOCTYPE') || doc.doctype) ? '<!DOCTYPE html>\n' : '';
         return docTypeStr + doc.documentElement.outerHTML;
@@ -2731,6 +2747,14 @@ ${!isRefining && extraNotes ? `\nNOTA ADICIONAL DEL PROFESOR: ${extraNotes}` : '
 '          const isPlh = first.value === "" || /--|select|choose|elige/i.test(first.textContent) || (!first.hasAttribute("data-answer") && !first.hasAttribute("data-correct") && !first.value.trim());\n' +
 '          const toShuffle = isPlh ? opts.slice(1) : opts.slice(0);\n' +
 '          if (toShuffle.length <= 1) return;\n' +
+'          const prefixRegex = /^([a-z0-9]{1,2}[\\.\\)]\\s+|[a-z0-9]{1,2}\\s*[-–—]\\s+|\\([a-z0-9]{1,2}\\)\\s*)/i;\n' +
+'          toShuffle.forEach(o => {\n' +
+'            const m = o.textContent.match(prefixRegex);\n' +
+'            if (m) {\n' +
+'              const cleaned = o.textContent.slice(m[0].length).trim();\n' +
+'              if (cleaned.length > 0) o.textContent = cleaned;\n' +
+'            }\n' +
+'          });\n' +
 '          fyShuffle(toShuffle);\n' +
 '          if (isPlh) sel.appendChild(first);\n' +
 '          toShuffle.forEach(o => sel.appendChild(o));\n' +
@@ -2764,6 +2788,42 @@ ${!isRefining && extraNotes ? `\nNOTA ADICIONAL DEL PROFESOR: ${extraNotes}` : '
 '            shuffleElements(btns, parent);\n' +
 '          }\n' +
 '        });\n' +
+'        if (!doc.getElementById("injected-runtime-shuffle")) {\n' +
+'          const scr = doc.createElement("script");\n' +
+'          scr.id = "injected-runtime-shuffle";\n' +
+'          scr.textContent = "(function() {\\n' +
+'  function runShuffle() {\\n' +
+'    const prefixRegex = /^([a-z0-9]{1,2}[\\\\.\\\\)]\\\\s+|[a-z0-9]{1,2}\\\\s*[-–—]\\\\s+|\\\\([a-z0-9]{1,2}\\\\)\\\\s*)/i;\\n' +
+'    document.querySelectorAll(\\"select\\").forEach(sel => {\\n' +
+'      const options = Array.from(sel.querySelectorAll(\\"option\\"));\\n' +
+'      if (options.length <= 1) return;\\n' +
+'      const hasPlaceholder = options[0].disabled || options[0].value === \\\"\\\" || /choose|select/i.test(options[0].textContent);\\n' +
+'      const first = hasPlaceholder ? options.shift() : null;\\n' +
+'      options.forEach(opt => {\\n' +
+'        opt.textContent = opt.textContent.replace(prefixRegex, \\\"\\\");\\n' +
+'      });\\n' +
+'      for (let i = options.length - 1; i > 0; i--) {\\n' +
+'        const j = Math.floor(Math.random() * (i + 1));\\n' +
+'        [options[i], options[j]] = [options[j], options[i]];\\n' +
+'      }\\n' +
+'      sel.innerHTML = \\\"\\\";\\n' +
+'      if (first) sel.appendChild(first);\\n' +
+'      options.forEach(opt => sel.appendChild(opt));\\n' +
+'    });\\n' +
+'    document.querySelectorAll(\\"[data-shuffle]\\").forEach(parent => {\\n' +
+'      const children = Array.from(parent.children).filter(el => !el.hasAttribute(\\"data-no-shuffle\\"));\\n' +
+'      for (let i = children.length - 1; i > 0; i--) {\\n' +
+'        const j = Math.floor(Math.random() * (i + 1));\\n' +
+'        [children[i], children[j]] = [children[j], children[i]];\\n' +
+'      }\\n' +
+'      children.forEach(el => parent.appendChild(el));\\n' +
+'    });\\n' +
+'  }\\n' +
+'  window.addEventListener(\\"load\\", () => setTimeout(runShuffle, 0));\\n' +
+'  if (document.readyState === \\"complete\\") setTimeout(runShuffle, 0);\\n' +
+'})();";\n' +
+'          (doc.body || doc.documentElement).appendChild(scr);\n' +
+'        }\n' +
 '        const docTypeStr = (rawHtml.trim().startsWith("<!DOCTYPE") || doc.doctype) ? "<!DOCTYPE html>\\\\n" : "";\n' +
 '        return docTypeStr + doc.documentElement.outerHTML;\n' +
 '      } catch (err) {\n' +
