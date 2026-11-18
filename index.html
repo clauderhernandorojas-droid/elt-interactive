@@ -2323,19 +2323,16 @@
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.models)) {
-            // Excluir estrictamente modelos que no admitan visión/imágenes o sean de solo voz/audio/embeddings
+            // Excluir estrictamente modelos que no admitan visión/imágenes, voz/audio, embeddings o con limit:0 en Free Tier (pro)
             const valid = data.models
               .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
               .map(m => m.name.replace(/^models\//, ''))
-              .filter(name => !/(-tts|audio|embedding|imagen|veo|robotics|aqa|lite)/i.test(name));
+              .filter(name => !/(-tts|audio|embedding|imagen|veo|robotics|aqa|lite|pro)/i.test(name));
 
-            // Prioridad rápida: 1. gemma-3-27b-it / gemma-3-12b-it | 2. gemini-3.8-pro
+            // Respaldo multimodal directo en capa gratuita: 1. gemma-3-27b-it | 2. gemma-3-12b-it
             const candidate = valid.find(m => m === 'gemma-3-27b-it')
               || valid.find(m => m === 'gemma-3-12b-it')
-              || valid.find(m => m === 'gemini-3.8-pro')
-              || valid.find(m => /^gemini-3\./i.test(m) && /pro/i.test(m))
               || valid.find(m => /gemma-3/i.test(m) && /it/i.test(m))
-              || valid.find(m => /pro/i.test(m) && !/experimental/i.test(m))
               || valid.find(m => /flash/i.test(m) && m !== primaryModel);
 
             if (candidate) {
@@ -2388,10 +2385,6 @@
 
         try {
           const genConfig = { temperature: 0.2 };
-          // Si es un modelo Gemini Pro, deshabilitar razonamiento extendido para acelerar respuesta
-          if (currentModel.includes('pro')) {
-            genConfig.thinkingConfig = { thinkingBudget: 0 };
-          }
 
           const response = await fetch(url, {
             method: "POST",
