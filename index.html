@@ -1578,7 +1578,7 @@
     function getSavedKey() { return localStorage.getItem('ai_api_key') || ''; }
     function getSavedModel() { 
       let model = localStorage.getItem('ai_model');
-      if (model === 'gemini-3.5-flash-lite' || model === 'gemini-3.5-flash' || model === 'gemini-2.5-flash' || model === 'gemini-2.5-flash-lite') {
+      if (model === 'gemini-3.5-flash-lite' || model === 'gemini-3.5-flash' || model === 'gemini-2.5-flash' || model === 'gemini-2.5-flash-lite' || model === 'gemini-3.8-flash-lite') {
         model = 'gemini-3.8-flash';
         localStorage.setItem('ai_model', model);
       }
@@ -1833,7 +1833,7 @@
       } else {
         modelInput.value = 'gemini-3.8-flash';
         keyInput.placeholder = 'AIzaSy...';
-        help.innerHTML = 'Recomendados Google: <code>gemini-3.8-flash</code> (visión OCR y velocidad) o <code>gemini-3.8-flash-lite</code> (alta eficiencia)';
+        help.innerHTML = 'Recomendado Google: <code>gemini-3.8-flash</code> (visión OCR y velocidad)';
       }
     }
 
@@ -1847,7 +1847,7 @@
         if (provider === 'openrouter') {
           help.innerHTML = 'Recomendados OpenRouter: <code>openai/gpt-4o-mini</code> o <code>google/gemini-2.5-flash</code>';
         } else {
-          help.innerHTML = 'Recomendados Google: <code>gemini-3.8-flash</code> (visión OCR y velocidad) o <code>gemini-3.8-flash-lite</code> (alta eficiencia)';
+          help.innerHTML = 'Recomendado Google: <code>gemini-3.8-flash</code> (visión OCR y velocidad)';
         }
       }
       document.getElementById('settingsModal').classList.remove('hidden');
@@ -2315,31 +2315,92 @@
       statusEl.textContent = message;
     }
 
-    async function fetchGeminiWithFallback(apiKey, initialModel, parts, signal) {
-      const primary = (initialModel === 'gemini-3.8-flash-lite') ? 'gemini-3.8-flash-lite' : 'gemini-3.8-flash';
-      const secondary = (primary === 'gemini-3.8-flash-lite') ? 'gemini-3.8-flash' : 'gemini-3.8-flash-lite';
-      const fallbackChain = [primary, secondary, primary];
+    let cachedFallbackModel = null;
+    async function resolveGoogleFallbackModel(apiKey, primaryModel = 'gemini-3.8-flash') {
+      if (cachedFallbackModel) return cachedFallbackModel;
+      try {
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data.models)) {
+            // Excluir estrictamente modelos que no admitan visión/imágenes o sean de solo voz/audio/embeddings
+            const valid = data.models
+              .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
+              .map(m => m.name.replace(/^models\//, ''))
+              .filter(name => !/(-tts|audio|embedding|imagen|veo|robotics|aqa|lite)/i.test(name));
 
-      const maxAttempts = 3; // 1 intento inicial + hasta 2 reintentos alternados
+            // Prioridad rápida: 1. gemma-3-27b-it / gemma-3-12b-it | 2. gemini-3.8-pro
+            const candidate = valid.find(m => m === 'gemma-3-27b-it')
+              || valid.find(m => m === 'gemma-3-12b-it')
+              || valid.find(m => m === 'gemini-3.8-pro')
+              || valid.find(m => /^gemini-3\./i.test(m) && /pro/i.test(m))
+              || valid.find(m => /gemma-3/i.test(m) && /it/i.test(m))
+              || valid.find(m => /pro/i.test(m) && !/experimental/i.test(m))
+              || valid.find(m => /flash/i.test(m) && m !== primaryModel);
+
+            if (candidate) {
+              cachedFallbackModel = candidate;
+              return candidate;
+            }
+          }
+        }
+      } catch (_) {}
+      return 'gemma-3-27b-it';
+    }
+
+    async function fetchGeminiWithFallback(apiKey, initialModel, parts, signal) {
+      const primaryModel = (initialModel && initialModel !== 'gemini-3.8-flash-lite') ? initialModel : 'gemini-3.8-flash';
+      const maxAttempts = 3; // Máximo 3 intentos rápidos
       let lastError = null;
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const currentModel = fallbackChain[attempt];
+        const isFinalFallback = attempt === maxAttempts - 1;
+        let currentModel = primaryModel;
+
+        if (isFinalFallback) {
+          currentModel = await resolveGoogleFallbackModel(apiKey, primaryModel);
+        }
+
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
 
         if (attempt > 0) {
-          setAiRetryStatus(`Alta demanda en Google (${lastError?.status || '503'}). Reintentando con ${currentModel} (intento ${attempt + 1}/${maxAttempts})...`, true);
+          setAiRetryStatus(`Reintentando con ${currentModel} (intento ${attempt + 1}/${maxAttempts})...`, true);
+        }
+
+        // Timeout estricto por intento (25 segundos)
+        const attemptController = new AbortController();
+        let isTimedOut = false;
+        const timeoutId = setTimeout(() => {
+          isTimedOut = true;
+          attemptController.abort(new Error("Timeout: Google tardó más de 25s"));
+        }, 25000);
+
+        const onUserAbort = () => {
+          attemptController.abort(new DOMException("Aborted", "AbortError"));
+        };
+        if (signal) {
+          if (signal.aborted) {
+            clearTimeout(timeoutId);
+            throw new DOMException("Aborted", "AbortError");
+          }
+          signal.addEventListener('abort', onUserAbort, { once: true });
         }
 
         try {
+          const genConfig = { temperature: 0.2 };
+          // Si es un modelo Gemini Pro, deshabilitar razonamiento extendido para acelerar respuesta
+          if (currentModel.includes('pro')) {
+            genConfig.thinkingConfig = { thinkingBudget: 0 };
+          }
+
           const response = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               contents: [{ parts: parts }],
-              generationConfig: { temperature: 0.2 }
+              generationConfig: genConfig
             }),
-            signal: signal
+            signal: attemptController.signal
           });
 
           if (!response.ok) {
@@ -2354,9 +2415,12 @@
 
             if ((response.status === 503 || response.status === 429) && attempt < maxAttempts - 1) {
               lastError = errObj;
-              const nextModel = fallbackChain[attempt + 1];
-              setAiRetryStatus(`Pico de demanda en Google (${response.status}). Esperando 2s para alternar a ${nextModel}...`, true);
-              await new Promise(r => setTimeout(r, 2000));
+              const nextAttemptNum = attempt + 2;
+              const willSwitch = (attempt === maxAttempts - 2);
+              const nextDesc = willSwitch ? 'respaldo rápido' : currentModel;
+
+              setAiRetryStatus(`Alta demanda en Google (${response.status}). Esperando 1.5s para reintentar con ${nextDesc} (intento ${nextAttemptNum}/${maxAttempts})...`, true);
+              await new Promise(r => setTimeout(r, 1500));
               if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
               continue;
             }
@@ -2373,23 +2437,36 @@
           return text.trim();
 
         } catch (err) {
-          if (err.name === 'AbortError' || signal?.aborted) {
+          if (signal?.aborted) {
             throw err;
           }
+
           lastError = err;
-          const isRetryable = err.status === 503 || err.status === 429 || /503|429|overloaded/i.test(err.message);
+          const isRetryable = isTimedOut 
+            || err.status === 503 
+            || err.status === 429 
+            || /503|429|overloaded|timeout/i.test(err.message);
+
           if (isRetryable && attempt < maxAttempts - 1) {
-            const nextModel = fallbackChain[attempt + 1];
-            setAiRetryStatus(`Reintentando conexión en 2s con ${nextModel}...`, true);
-            await new Promise(r => setTimeout(r, 2000));
+            const nextAttemptNum = attempt + 2;
+            const willSwitch = (attempt === maxAttempts - 2);
+            const nextDesc = willSwitch ? 'respaldo rápido' : currentModel;
+            const reason = isTimedOut ? "Timeout (25s) excedido" : (err.status ? `Error ${err.status}` : "Error de conexión");
+
+            setAiRetryStatus(`${reason}. Esperando 1.5s para reintentar con ${nextDesc} (intento ${nextAttemptNum}/${maxAttempts})...`, true);
+            await new Promise(r => setTimeout(r, 1500));
             if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
             continue;
           }
+
           throw err;
+        } finally {
+          clearTimeout(timeoutId);
+          if (signal) signal.removeEventListener('abort', onUserAbort);
         }
       }
 
-      throw lastError || new Error("Se agotaron los reintentos con la API de Google.");
+      throw lastError || new Error("Se agotaron los reintentos ante la saturación de la API de Google.");
     }
 
     // GENERAR CON IA HÍBRIDA (OPENROUTER / GOOGLE AI STUDIO)
