@@ -2410,7 +2410,7 @@
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.models)) {
-            // Filtrar modelos reales que soporten generateContent y excluir los no visuales o con cuota limit:0 (pro)
+            // Filtrar modelos reales que soporten generateContent y excluir no visuales o con cuota limit:0 (pro)
             const valid = data.models
               .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes('generateContent'))
               .map(m => m.name.replace(/^models\//, ''))
@@ -2420,8 +2420,11 @@
                 return true;
               });
 
-            // Si hay otro modelo real válido distinto al activo, usarlo como respaldo
-            const candidate = valid.find(m => m !== primaryModel);
+            // Prioridad: 1. gemma-4-26b-a4b-it / gemma-4-*  2. Cualquier otro modelo válido distinto al primario
+            const candidate = valid.find(m => m === 'gemma-4-26b-a4b-it')
+              || valid.find(m => /^gemma-4/i.test(m))
+              || valid.find(m => m !== primaryModel);
+
             if (candidate) {
               cachedFallbackModel = candidate;
               return candidate;
@@ -2429,37 +2432,41 @@
           }
         }
       } catch (_) {}
-      // Si no hay otro modelo secundario real disponible, reintentar siempre sobre el modelo primario
-      return primaryModel;
+      return 'gemma-4-26b-a4b-it';
     }
 
     async function fetchGeminiWithFallback(apiKey, initialModel, parts, signal) {
       const primaryModel = (initialModel && initialModel !== 'gemini-3.8-flash-lite') ? initialModel : 'gemini-3.8-flash';
-      const delays = [3000, 6000]; // Esperas de 3s y 6s ante 503/429
+      const delays = [2000, 3000]; // Esperas breves de 2s antes de intento 2, y 3s antes de intento 3
       const maxAttempts = 3;
       let lastError = null;
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const isFinalFallback = attempt === maxAttempts - 1;
+        // Intento 1: modelo activo (timeout estricto 20s)
+        // Intentos 2 y 3: salto directo al respaldo gemma-4 con timeout amplio de 55s para generar HTML completo
+        const isFallbackAttempt = attempt > 0;
         let currentModel = primaryModel;
+        let timeoutMs = 20000; // 20s para el intento inicial
 
-        if (isFinalFallback) {
+        if (isFallbackAttempt) {
           currentModel = await resolveGoogleFallbackModel(apiKey, primaryModel);
+          timeoutMs = 55000; // 55s para los intentos de respaldo
         }
 
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
 
         if (attempt > 0) {
-          setAiRetryStatus(`Reintentando con ${currentModel} (intento ${attempt + 1}/${maxAttempts})...`, true);
+          setAiRetryStatus(`Generando con ${currentModel} (intento ${attempt + 1}/${maxAttempts}, límite 55s)...`, true);
         }
 
-        // Timeout estricto de 25 segundos por intento
+        // Timeout estricto adaptativo por intento
         const attemptController = new AbortController();
         let isTimedOut = false;
+        const timeoutSeconds = Math.round(timeoutMs / 1000);
         const timeoutId = setTimeout(() => {
           isTimedOut = true;
-          attemptController.abort(new Error("Timeout: Google no respondió en 25s"));
-        }, 25000);
+          attemptController.abort(new Error(`Timeout: ${currentModel} no respondió en ${timeoutSeconds}s`));
+        }, timeoutMs);
 
         const onUserAbort = () => {
           attemptController.abort(new DOMException("Aborted", "AbortError"));
@@ -2497,11 +2504,12 @@
 
             if ((response.status === 503 || response.status === 429) && attempt < maxAttempts - 1) {
               lastError = errObj;
-              const waitMs = delays[attempt] || 3000;
+              const waitMs = delays[attempt] || 2000;
               const waitSec = (waitMs / 1000).toFixed(0);
               const nextAttemptNum = attempt + 2;
+              const nextDesc = (attempt === 0) ? 'modelo de respaldo (gemma-4)' : currentModel;
 
-              setAiRetryStatus(`Pico de demanda en Google (${response.status}). Esperando ${waitSec}s para reintentar (intento ${nextAttemptNum}/${maxAttempts})...`, true);
+              setAiRetryStatus(`Pico de saturación en Google (${response.status}). Saltando en ${waitSec}s a ${nextDesc} (intento ${nextAttemptNum}/${maxAttempts})...`, true);
               await new Promise(r => setTimeout(r, waitMs));
               if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
               continue;
@@ -2530,12 +2538,13 @@
             || /503|429|overloaded|timeout/i.test(err.message);
 
           if (isRetryable && attempt < maxAttempts - 1) {
-            const waitMs = delays[attempt] || 3000;
+            const waitMs = delays[attempt] || 2000;
             const waitSec = (waitMs / 1000).toFixed(0);
             const nextAttemptNum = attempt + 2;
-            const reason = isTimedOut ? "Timeout (25s) excedido" : (err.status ? `Error ${err.status}` : "Pico de saturación");
+            const nextDesc = (attempt === 0) ? 'modelo de respaldo (gemma-4)' : currentModel;
+            const reason = isTimedOut ? `Timeout (${timeoutSeconds}s) excedido` : (err.status ? `Error ${err.status}` : "Pico de saturación");
 
-            setAiRetryStatus(`${reason}. Esperando ${waitSec}s para reintentar (intento ${nextAttemptNum}/${maxAttempts})...`, true);
+            setAiRetryStatus(`${reason}. Saltando en ${waitSec}s a ${nextDesc} (intento ${nextAttemptNum}/${maxAttempts})...`, true);
             await new Promise(r => setTimeout(r, waitMs));
             if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
             continue;
