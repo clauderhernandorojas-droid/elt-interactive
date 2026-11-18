@@ -1577,7 +1577,12 @@
     function getSavedProvider() { return localStorage.getItem('ai_provider') || 'openrouter'; }
     function getSavedKey() { return localStorage.getItem('ai_api_key') || ''; }
     function getSavedModel() { 
-      return localStorage.getItem('ai_model') || (getSavedProvider() === 'openrouter' ? 'openai/gpt-4o-mini' : 'gemini-3.5-flash-lite'); 
+      let model = localStorage.getItem('ai_model');
+      if (model === 'gemini-3.5-flash-lite' || model === 'gemini-3.5-flash') {
+        model = 'gemini-2.5-flash';
+        localStorage.setItem('ai_model', model);
+      }
+      return model || (getSavedProvider() === 'openrouter' ? 'openai/gpt-4o-mini' : 'gemini-2.5-flash'); 
     }
 
     function updateBadge() { 
@@ -1826,16 +1831,25 @@
         keyInput.placeholder = 'sk-or-v1-...';
         help.innerHTML = 'Recomendados OpenRouter: <code>openai/gpt-4o-mini</code> o <code>google/gemini-2.5-flash</code>';
       } else {
-        modelInput.value = 'gemini-3.5-flash-lite';
+        modelInput.value = 'gemini-2.5-flash';
         keyInput.placeholder = 'AIzaSy...';
-        help.innerHTML = 'Recomendado Google: <code>gemini-3.5-flash-lite</code> o <code>gemini-3.5-flash</code>';
+        help.innerHTML = 'Recomendados Google: <code>gemini-2.5-flash</code> (visión OCR de alta precisión) o <code>gemini-2.5-flash-lite</code> (alta velocidad)';
       }
     }
 
     function openSettingsModal() {
-      document.getElementById('aiProviderSelect').value = getSavedProvider();
+      const provider = getSavedProvider();
+      document.getElementById('aiProviderSelect').value = provider;
       document.getElementById('aiApiKeyInput').value = getSavedKey();
       document.getElementById('aiModelInput').value = getSavedModel();
+      const help = document.getElementById('modelHelpText');
+      if (help) {
+        if (provider === 'openrouter') {
+          help.innerHTML = 'Recomendados OpenRouter: <code>openai/gpt-4o-mini</code> o <code>google/gemini-2.5-flash</code>';
+        } else {
+          help.innerHTML = 'Recomendados Google: <code>gemini-2.5-flash</code> (visión OCR de alta precisión) o <code>gemini-2.5-flash-lite</code> (alta velocidad)';
+        }
+      }
       document.getElementById('settingsModal').classList.remove('hidden');
     }
     function closeSettingsModal() { document.getElementById('settingsModal').classList.add('hidden'); }
@@ -1884,6 +1898,7 @@
         } catch (e) {}
         currentAiAbortController = null;
       }
+      setAiRetryStatus(null);
       document.getElementById('generateModal').classList.add('hidden');
     }
 
@@ -1897,6 +1912,7 @@
         currentAiAbortController = null;
         document.getElementById('aiLoadingIndicator').classList.add('hidden');
         document.getElementById('generateAiBtn').disabled = false;
+        setAiRetryStatus(null);
         console.log("Generación cancelada por el usuario");
         return;
       }
@@ -2104,14 +2120,51 @@
       });
     }
 
-    function processStudentImageFile(file, fallbackName) {
-      const reader = new FileReader();
-      reader.onload = evt => {
-        const dataUrl = evt.target.result;
-        const parts = dataUrl.split(',');
-        const mimeType = parts[0].match(/:(.*?);/)[1];
-        const rawData = parts[1];
+    // Compresión inteligente en canvas: escala si el lado mayor > 1280px y exporta como JPEG 0.85
+    function compressAndProcessImage(file, maxDimension = 1280, quality = 0.85) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = evt => {
+          const img = new Image();
+          img.onload = () => {
+            let width = img.width;
+            let height = img.height;
 
+            if (width > maxDimension || height > maxDimension) {
+              if (width > height) {
+                height = Math.round((height * maxDimension) / width);
+                width = maxDimension;
+              } else {
+                width = Math.round((width * maxDimension) / height);
+                height = maxDimension;
+              }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, width, height);
+            ctx.drawImage(img, 0, 0, width, height);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', quality);
+            const parts = dataUrl.split(',');
+            const mimeType = 'image/jpeg';
+            const rawData = parts[1];
+
+            resolve({ dataUrl, mimeType, rawData });
+          };
+          img.onerror = () => reject(new Error('No se pudo decodificar la imagen'));
+          img.src = evt.target.result;
+        };
+        reader.onerror = () => reject(new Error('No se pudo leer el archivo de imagen'));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    function processStudentImageFile(file, fallbackName) {
+      compressAndProcessImage(file, 1280, 0.85).then(({ dataUrl, mimeType, rawData }) => {
         studentImages.push({
           name: fallbackName || `Foto #${studentImages.length + 1}`,
           dataUrl: dataUrl,
@@ -2119,8 +2172,9 @@
           rawData: rawData
         });
         updateStudentImagesGallery();
-      };
-      reader.readAsDataURL(file);
+      }).catch(err => {
+        console.error("Error al procesar foto del alumno:", err);
+      });
     }
 
     function removeStudentImage(index) {
@@ -2187,13 +2241,7 @@
     }
 
     function processReferenceImageFile(file, fallbackName) {
-      const reader = new FileReader();
-      reader.onload = evt => {
-        const dataUrl = evt.target.result;
-        const parts = dataUrl.split(',');
-        const mimeType = parts[0].match(/:(.*?);/)[1];
-        const rawData = parts[1];
-
+      compressAndProcessImage(file, 1280, 0.85).then(({ dataUrl, mimeType, rawData }) => {
         referenceImages.push({
           name: fallbackName || `Recorte OCR #${referenceImages.length + 1}`,
           dataUrl: dataUrl,
@@ -2201,8 +2249,9 @@
           rawData: rawData
         });
         updateReferenceImagesGallery();
-      };
-      reader.readAsDataURL(file);
+      }).catch(err => {
+        console.error("Error al procesar recorte de referencia:", err);
+      });
     }
 
     function removeReferenceImage(index) {
@@ -2245,6 +2294,103 @@
         `;
         gallery.appendChild(card);
       });
+    }
+
+    function setAiRetryStatus(message, isWarning = false) {
+      const container = document.getElementById('aiLoadingIndicator');
+      if (!container) return;
+      let statusEl = document.getElementById('aiRetryStatusText');
+      if (!message) {
+        if (statusEl) statusEl.remove();
+        return;
+      }
+      if (!statusEl) {
+        statusEl = document.createElement('p');
+        statusEl.id = 'aiRetryStatusText';
+        container.appendChild(statusEl);
+      }
+      statusEl.className = isWarning 
+        ? 'text-[11px] font-semibold text-amber-700 bg-amber-50/90 border border-amber-200 px-2.5 py-1 rounded-md mt-2 mx-auto inline-block max-w-[90%]'
+        : 'text-[10px] text-indigo-600 mt-1';
+      statusEl.textContent = message;
+    }
+
+    async function fetchGeminiWithFallback(apiKey, initialModel, parts, signal) {
+      const fallbackChain = [initialModel];
+      ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'].forEach(m => {
+        if (!fallbackChain.includes(m)) fallbackChain.push(m);
+      });
+
+      const maxAttempts = 3; // 1 intento inicial + hasta 2 reintentos
+      let lastError = null;
+
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        const currentModel = fallbackChain[attempt] || fallbackChain[0];
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
+
+        if (attempt > 0) {
+          setAiRetryStatus(`Alta demanda en Google (${lastError?.status || '503'}). Reintentando con ${currentModel} (intento ${attempt + 1}/${maxAttempts})...`, true);
+        }
+
+        try {
+          const response = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: parts }],
+              generationConfig: { temperature: 0.2 }
+            }),
+            signal: signal
+          });
+
+          if (!response.ok) {
+            let errMessage = `Error Google HTTP ${response.status}`;
+            try {
+              const errData = await response.json();
+              if (errData.error?.message) errMessage = errData.error.message;
+            } catch (_) {}
+
+            const errObj = new Error(errMessage);
+            errObj.status = response.status;
+
+            if ((response.status === 503 || response.status === 429) && attempt < maxAttempts - 1) {
+              lastError = errObj;
+              const nextModel = fallbackChain[attempt + 1] || 'modelo alternativo';
+              setAiRetryStatus(`Pico de demanda en Google (${response.status}). Esperando 1.5s para alternar a ${nextModel}...`, true);
+              await new Promise(r => setTimeout(r, 1500));
+              if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+              continue;
+            }
+
+            throw errObj;
+          }
+
+          const data = await response.json();
+          const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (!text) {
+            throw new Error("La API de Google devolvió una respuesta sin texto generado.");
+          }
+          setAiRetryStatus(null);
+          return text.trim();
+
+        } catch (err) {
+          if (err.name === 'AbortError' || signal?.aborted) {
+            throw err;
+          }
+          lastError = err;
+          const isRetryable = err.status === 503 || err.status === 429 || /503|429|overloaded/i.test(err.message);
+          if (isRetryable && attempt < maxAttempts - 1) {
+            const nextModel = fallbackChain[attempt + 1] || 'modelo alternativo';
+            setAiRetryStatus(`Reintentando conexión en 1.5s con ${nextModel}...`, true);
+            await new Promise(r => setTimeout(r, 1500));
+            if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
+            continue;
+          }
+          throw err;
+        }
+      }
+
+      throw lastError || new Error("Se agotaron los reintentos con la API de Google.");
     }
 
     // GENERAR CON IA HÍBRIDA (OPENROUTER / GOOGLE AI STUDIO)
@@ -2504,24 +2650,7 @@ ${!isRefining && extraNotes ? `\nNOTA ADICIONAL DEL PROFESOR: ${extraNotes}` : '
             });
           });
 
-          const url = `https://generativelanguage.googleapis.com/v1beta/models/${activeModel}:generateContent?key=${apiKey}`;
-          const response = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              contents: [{ parts: parts }],
-              generationConfig: { temperature: 0.2 }
-            }),
-            signal: currentAiAbortController.signal
-          });
-
-          if (!response.ok) {
-            const errData = await response.json();
-            throw new Error(errData.error?.message || `Error Google HTTP ${response.status}`);
-          }
-
-          const data = await response.json();
-          generatedHtml = data.candidates[0].content.parts[0].text.trim();
+          generatedHtml = await fetchGeminiWithFallback(apiKey, activeModel, parts, currentAiAbortController.signal);
         }
 
         if (generatedHtml.startsWith("```html")) {
@@ -2633,6 +2762,7 @@ ${!isRefining && extraNotes ? `\nNOTA ADICIONAL DEL PROFESOR: ${extraNotes}` : '
         currentAiAbortController = null;
         document.getElementById('aiLoadingIndicator').classList.add('hidden');
         document.getElementById('generateAiBtn').disabled = false;
+        setAiRetryStatus(null);
       }
     }
 
