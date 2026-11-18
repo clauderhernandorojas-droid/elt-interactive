@@ -1578,11 +1578,11 @@
     function getSavedKey() { return localStorage.getItem('ai_api_key') || ''; }
     function getSavedModel() { 
       let model = localStorage.getItem('ai_model');
-      if (model === 'gemini-3.5-flash-lite' || model === 'gemini-3.5-flash') {
-        model = 'gemini-2.5-flash';
+      if (model === 'gemini-3.5-flash-lite' || model === 'gemini-3.5-flash' || model === 'gemini-2.5-flash' || model === 'gemini-2.5-flash-lite') {
+        model = 'gemini-3.8-flash';
         localStorage.setItem('ai_model', model);
       }
-      return model || (getSavedProvider() === 'openrouter' ? 'openai/gpt-4o-mini' : 'gemini-2.5-flash'); 
+      return model || (getSavedProvider() === 'openrouter' ? 'openai/gpt-4o-mini' : 'gemini-3.8-flash'); 
     }
 
     function updateBadge() { 
@@ -1831,9 +1831,9 @@
         keyInput.placeholder = 'sk-or-v1-...';
         help.innerHTML = 'Recomendados OpenRouter: <code>openai/gpt-4o-mini</code> o <code>google/gemini-2.5-flash</code>';
       } else {
-        modelInput.value = 'gemini-2.5-flash';
+        modelInput.value = 'gemini-3.8-flash';
         keyInput.placeholder = 'AIzaSy...';
-        help.innerHTML = 'Recomendados Google: <code>gemini-2.5-flash</code> (visión OCR de alta precisión) o <code>gemini-2.5-flash-lite</code> (alta velocidad)';
+        help.innerHTML = 'Recomendados Google: <code>gemini-3.8-flash</code> (visión OCR y velocidad) o <code>gemini-3.8-flash-lite</code> (alta eficiencia)';
       }
     }
 
@@ -1847,7 +1847,7 @@
         if (provider === 'openrouter') {
           help.innerHTML = 'Recomendados OpenRouter: <code>openai/gpt-4o-mini</code> o <code>google/gemini-2.5-flash</code>';
         } else {
-          help.innerHTML = 'Recomendados Google: <code>gemini-2.5-flash</code> (visión OCR de alta precisión) o <code>gemini-2.5-flash-lite</code> (alta velocidad)';
+          help.innerHTML = 'Recomendados Google: <code>gemini-3.8-flash</code> (visión OCR y velocidad) o <code>gemini-3.8-flash-lite</code> (alta eficiencia)';
         }
       }
       document.getElementById('settingsModal').classList.remove('hidden');
@@ -2316,16 +2316,15 @@
     }
 
     async function fetchGeminiWithFallback(apiKey, initialModel, parts, signal) {
-      const fallbackChain = [initialModel];
-      ['gemini-2.5-flash', 'gemini-2.5-flash-lite', 'gemini-2.0-flash'].forEach(m => {
-        if (!fallbackChain.includes(m)) fallbackChain.push(m);
-      });
+      const primary = (initialModel === 'gemini-3.8-flash-lite') ? 'gemini-3.8-flash-lite' : 'gemini-3.8-flash';
+      const secondary = (primary === 'gemini-3.8-flash-lite') ? 'gemini-3.8-flash' : 'gemini-3.8-flash-lite';
+      const fallbackChain = [primary, secondary, primary];
 
-      const maxAttempts = 3; // 1 intento inicial + hasta 2 reintentos
+      const maxAttempts = 3; // 1 intento inicial + hasta 2 reintentos alternados
       let lastError = null;
 
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const currentModel = fallbackChain[attempt] || fallbackChain[0];
+        const currentModel = fallbackChain[attempt];
         const url = `https://generativelanguage.googleapis.com/v1beta/models/${currentModel}:generateContent?key=${apiKey}`;
 
         if (attempt > 0) {
@@ -2355,9 +2354,9 @@
 
             if ((response.status === 503 || response.status === 429) && attempt < maxAttempts - 1) {
               lastError = errObj;
-              const nextModel = fallbackChain[attempt + 1] || 'modelo alternativo';
-              setAiRetryStatus(`Pico de demanda en Google (${response.status}). Esperando 1.5s para alternar a ${nextModel}...`, true);
-              await new Promise(r => setTimeout(r, 1500));
+              const nextModel = fallbackChain[attempt + 1];
+              setAiRetryStatus(`Pico de demanda en Google (${response.status}). Esperando 2s para alternar a ${nextModel}...`, true);
+              await new Promise(r => setTimeout(r, 2000));
               if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
               continue;
             }
@@ -2380,9 +2379,9 @@
           lastError = err;
           const isRetryable = err.status === 503 || err.status === 429 || /503|429|overloaded/i.test(err.message);
           if (isRetryable && attempt < maxAttempts - 1) {
-            const nextModel = fallbackChain[attempt + 1] || 'modelo alternativo';
-            setAiRetryStatus(`Reintentando conexión en 1.5s con ${nextModel}...`, true);
-            await new Promise(r => setTimeout(r, 1500));
+            const nextModel = fallbackChain[attempt + 1];
+            setAiRetryStatus(`Reintentando conexión en 2s con ${nextModel}...`, true);
+            await new Promise(r => setTimeout(r, 2000));
             if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
             continue;
           }
